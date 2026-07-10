@@ -14,26 +14,32 @@ Ouvre simplement `index.html` dans ton navigateur (double-clic), c'est tout.
 ## ✨ Fonctionnalités
 
 ### Mode « Génération auto »
-Des **vrais styles de vêtements**, pas juste des motifs :
-- **Shirts** : t-shirt col rond, hoodie (cordons + poche kangourou + capuche), veste varsity,
-  maillot de sport avec numéro, chemise (col + boutons), pull rayé
-- **Pants** : jean (surpiqûres, poches, passants), jogging, cargo, short (jambes coupées,
-  la peau apparaît), pantalon costume (pli de repassage)
-- **T-Shirts** : badge, marinière, dégradé, sport avec numéro, tie-dye, camouflage
-- 18 palettes de couleurs soignées (avec variation aléatoire) ou couleur au choix
-- Motif du tissu configurable (rayures, damier, camo…) ou choisi par le style
-- Texte personnalisé sur la poitrine (T-Shirt)
-- **Génération en lot** : 1, 6, 12 ou 24 designs d'un coup
-- **Shadows réalistes** : ombrage des faces, assombrissement des bords, plis de tissu,
-  grain textile
+Des **vrais styles de vêtements**, dont les tendances :
+- **Shirts** : t-shirt col rond, hoodie, veste varsity, maillot de sport, chemise, pull rayé,
+  🖤 **Emo** (cœur brisé, manches rayées), ✨ **Y2K** (papillon, sparkles), 🌸 **Kawaii**,
+  🎸 **Grunge** (flanelle usée), 🔥 **Streetwear** (gros print)
+- **Pants** : jean, jogging, cargo, short (peau visible), costume,
+  🖤 **Emo** (skinny + chaîne + ceinture cloutée), ✨ **Y2K** (flare + papillon brodé),
+  🎸 **Grunge** (jean troué — la peau apparaît dans les déchirures), 🌸 **Kawaii**
+- **T-Shirts** : badge, marinière, dégradé, sport, tie-dye, camo + Emo / Y2K / Kawaii / Grunge
+- **Coupe au choix** : mixte, féminine (crop top + manches courtes) ou masculine
+- Palettes thématiques par tendance + 18 palettes générales soignées, ou couleur au choix
+- Texte personnalisé sur la poitrine (T-Shirt), génération en lot (jusqu'à 24)
+- **Shadows réalistes** : ombrage des faces, bords assombris, plis de tissu, grain textile
 
 ### Mode « Depuis une image »
 Dépose n'importe quelle image (logo, dessin, même une photo) :
-- ✂️ **Suppression automatique du fond** (détection des couleurs de bord, sensibilité
-  réglable) + recadrage automatique sur le motif
-- Placements : **logo sur la poitrine** (ombre portée incluse), remplir chaque face,
-  ou étirer sur tout le template
+- ✂️ **Suppression automatique du fond** (sensibilité réglable) + recadrage sur le motif
+- Placements : **logo poitrine** (ombre portée), **logo devant + dos**,
+  **motif répété** (tissu imprimé, taille réglable), **image continue par partie du corps**,
+  ou étirée sur tout le template
 - Ombres réalistes optionnelles sur le vêtement
+
+### Couverture garantie des épaules
+Le tissu est peint sur toute la zone englobante de chaque croix du template (gouttières
+comprises) : la position exacte des petites faces HAUT/BAS variant selon les versions du
+template officiel, les couvrir large garantit qu'en jeu, le dessus des bras/jambes et les
+dessous sont toujours texturés. Les pixels en trop ne sont jamais affichés par Roblox.
 
 ### Export
 - Téléchargement PNG individuel (transparence hors des zones du template ✔)
