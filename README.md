@@ -14,19 +14,26 @@ Ouvre simplement `index.html` dans ton navigateur (double-clic), c'est tout.
 ## ✨ Fonctionnalités
 
 ### Mode « Génération auto »
-- 8 motifs : uni, rayures (H/V), dégradé, damier, pois, camouflage, tie-dye — ou **aléatoire**
-- Palettes de couleurs générées automatiquement (harmonies complémentaires, analogues, triades…)
-- Détails réalistes : col, boutons, poche, ourlets pour les shirts · ceinture, braguette,
-  poches, bande latérale pour les pants · badge pour les t-shirts
-- Texte personnalisé sur la poitrine
+Des **vrais styles de vêtements**, pas juste des motifs :
+- **Shirts** : t-shirt col rond, hoodie (cordons + poche kangourou + capuche), veste varsity,
+  maillot de sport avec numéro, chemise (col + boutons), pull rayé
+- **Pants** : jean (surpiqûres, poches, passants), jogging, cargo, short (jambes coupées,
+  la peau apparaît), pantalon costume (pli de repassage)
+- **T-Shirts** : badge, marinière, dégradé, sport avec numéro, tie-dye, camouflage
+- 18 palettes de couleurs soignées (avec variation aléatoire) ou couleur au choix
+- Motif du tissu configurable (rayures, damier, camo…) ou choisi par le style
+- Texte personnalisé sur la poitrine (T-Shirt)
 - **Génération en lot** : 1, 6, 12 ou 24 designs d'un coup
-- Ombrage automatique des faces (côtés/dos plus sombres) pour un rendu volumique en jeu
+- **Shadows réalistes** : ombrage des faces, assombrissement des bords, plis de tissu,
+  grain textile
 
 ### Mode « Depuis une image »
-Dépose n'importe quelle image (logo, texture, dessin) et choisis le placement :
-- **Remplir chaque face** — l'image couvre chaque zone du template
-- **Étirer sur tout le template** — pour les designs déjà au format 585×559
-- **Logo sur la poitrine** — couleur unie + ton logo centré (taille réglable)
+Dépose n'importe quelle image (logo, dessin, même une photo) :
+- ✂️ **Suppression automatique du fond** (détection des couleurs de bord, sensibilité
+  réglable) + recadrage automatique sur le motif
+- Placements : **logo sur la poitrine** (ombre portée incluse), remplir chaque face,
+  ou étirer sur tout le template
+- Ombres réalistes optionnelles sur le vêtement
 
 ### Export
 - Téléchargement PNG individuel (transparence hors des zones du template ✔)
