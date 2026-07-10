@@ -159,10 +159,26 @@
         <select id="placementSel">
           <option value="logo" selected>Logo sur la poitrine</option>
           <option value="logoback">Logo devant + dos</option>
+          <option value="libre">🎯 Placement libre (glisser-déposer)</option>
           <option value="tile">Motif répété (tissu imprimé)</option>
           <option value="faces">Image continue sur chaque partie</option>
           <option value="whole">Étirer sur tout le template</option>
         </select>
+      </div>
+
+      <div id="freeOpts" style="display:none">
+        <button class="btn ghost" id="addStickerBtn" style="margin-bottom:10px">➕ Poser l'image sur le vêtement</button>
+        <div class="field">
+          <label>Taille du sticker sélectionné</label>
+          <input type="range" id="stkSize" min="16" max="320" value="90">
+          <label style="margin-top:8px">Rotation</label>
+          <input type="range" id="stkRot" min="-180" max="180" value="0">
+        </div>
+        <div class="row" style="margin-bottom:10px">
+          <button class="btn small ghost" id="stkDupBtn">📄 Dupliquer</button>
+          <button class="btn small ghost" id="stkDelBtn">🗑️ Supprimer</button>
+        </div>
+        <div class="hint" style="margin:0 0 10px">🎯 <b>Glisse les stickers directement sur l'aperçu.</b> Le design affiché sert de fond : génère d'abord un style en mode auto (ex. un hoodie emo), reviens ici, et pose ton image dessus. Tu peux en empiler plusieurs.</div>
       </div>
 
       <div class="field" id="logoOpts">
@@ -1432,6 +1448,7 @@ $('typeTabs').addEventListener('click',e=>{
   curType=e.target.dataset.type;
   setTabs($('typeTabs'),'type',curType);
   refreshTypeUI();
+  if(freeMode){ stickers=[]; selStk=-1; enterFree(); } // la taille du canvas change
 });
 $('modeTabs').addEventListener('click',e=>{
   if(!e.target.dataset.mode) return;
@@ -1439,13 +1456,156 @@ $('modeTabs').addEventListener('click',e=>{
   setTabs($('modeTabs'),'mode',curMode);
   $('autoControls').style.display = curMode==='auto'?'':'none';
   $('imageControls').style.display = curMode==='image'?'':'none';
+  if(curMode==='image' && $('placementSel').value==='libre') enterFree();
+  else exitFree();
 });
 $('placementSel').addEventListener('change',()=>{
   const v=$('placementSel').value;
   $('logoOpts').style.display = (v==='logo'||v==='logoback'||v==='tile')?'':'none';
+  $('freeOpts').style.display = v==='libre'?'':'none';
   $('logoScaleLbl').textContent = v==='tile' ? 'Taille du motif répété' : 'Taille du logo';
   $('logoBaseLbl').textContent = v==='tile' ? 'Couleur de fond' : 'Couleur du vêtement (sous le logo)';
+  if(v==='libre') enterFree(); else exitFree();
 });
+
+/* ========================= PLACEMENT LIBRE (stickers) ========================= */
+let freeMode=false, freeBase=null;
+let stickers=[], selStk=-1;
+
+function plainBase(kind){
+  const rng=mulberry32(Math.floor(Math.random()*1e9));
+  if(kind==='tshirt'){
+    const c=document.createElement('canvas'); c.width=512; c.height=512;
+    const x=c.getContext('2d');
+    x.fillStyle=$('logoBase').value; x.fillRect(0,0,512,512);
+    tshirtShadows(x,512,rng);
+    return c;
+  }
+  const c=document.createElement('canvas'); c.width=TW; c.height=TH;
+  const x=c.getContext('2d');
+  x.save(); clipToZones(x);
+  x.fillStyle=$('logoBase').value; x.fillRect(0,0,TW,TH);
+  shadeFaces(x); edgeAO(x); wrinkles(x,rng);
+  x.restore();
+  return c;
+}
+function enterFree(){
+  freeMode=true;
+  freeBase = (current && current.kind===curType) ? current.canvas : plainBase(curType);
+  renderFree();
+}
+function exitFree(){
+  if(!freeMode) return;
+  freeMode=false;
+  renderMain();
+}
+function stickerDims(s){
+  const w=s.w, h=s.w*(s.img.height/s.img.width);
+  return {w,h};
+}
+function bakeFree(withOutline){
+  const isT=curType==='tshirt';
+  const c=document.createElement('canvas');
+  c.width=isT?512:TW; c.height=isT?512:TH;
+  const x=c.getContext('2d');
+  x.drawImage(freeBase,0,0);
+  x.save();
+  if(!isT) clipToZones(x);
+  for(const s of stickers){
+    const {w,h}=stickerDims(s);
+    x.save();
+    x.translate(s.x,s.y); x.rotate(s.rot*Math.PI/180);
+    x.shadowColor='rgba(0,0,0,0.45)'; x.shadowBlur=8; x.shadowOffsetY=4;
+    x.drawImage(s.img,-w/2,-h/2,w,h);
+    x.restore();
+  }
+  x.restore();
+  if(withOutline && selStk>=0 && stickers[selStk]){
+    const s=stickers[selStk], {w,h}=stickerDims(s);
+    x.save();
+    x.translate(s.x,s.y); x.rotate(s.rot*Math.PI/180);
+    x.strokeStyle='#4f8cff'; x.lineWidth=2; x.setLineDash([7,5]);
+    x.strokeRect(-w/2-4,-h/2-4,w+8,h+8);
+    x.restore();
+  }
+  return c;
+}
+function renderFree(){
+  if(!freeMode) return;
+  const mc=$('mainCanvas');
+  const baked=bakeFree(true);
+  mc.width=baked.width; mc.height=baked.height;
+  mc.getContext('2d').drawImage(baked,0,0);
+  drawAvatar($('avatarCanvas'), curType, bakeFree(false));
+  $('seedBadge').textContent=`${stickers.length} sticker${stickers.length>1?'s':''}`;
+}
+$('addStickerBtn').addEventListener('click',()=>{
+  if(!processedImg){ dz.style.borderColor='var(--danger)'; setTimeout(()=>dz.style.borderColor='',900); return; }
+  const isT=curType==='tshirt';
+  const fr=TORSO.front;
+  stickers.push({
+    img:processedImg,
+    x: isT?256:fr.x+fr.w/2 + stickers.length*8,
+    y: isT?256:fr.y+fr.h/2 + stickers.length*8,
+    w: parseInt($('stkSize').value,10),
+    rot: parseInt($('stkRot').value,10),
+  });
+  selStk=stickers.length-1;
+  renderFree();
+});
+$('stkSize').addEventListener('input',()=>{
+  if(freeMode && selStk>=0 && stickers[selStk]){ stickers[selStk].w=parseInt($('stkSize').value,10); renderFree(); }
+});
+$('stkRot').addEventListener('input',()=>{
+  if(freeMode && selStk>=0 && stickers[selStk]){ stickers[selStk].rot=parseInt($('stkRot').value,10); renderFree(); }
+});
+$('stkDelBtn').addEventListener('click',()=>{
+  if(selStk>=0){ stickers.splice(selStk,1); selStk=stickers.length-1; renderFree(); }
+});
+$('stkDupBtn').addEventListener('click',()=>{
+  if(selStk>=0 && stickers[selStk]){
+    const s=stickers[selStk];
+    stickers.push({...s, x:s.x+16, y:s.y+16});
+    selStk=stickers.length-1;
+    renderFree();
+  }
+});
+
+/* drag des stickers sur l'aperçu */
+let dragging=false, dragDX=0, dragDY=0;
+function canvasPos(e){
+  const mc=$('mainCanvas'), r=mc.getBoundingClientRect();
+  return {x:(e.clientX-r.left)*mc.width/r.width, y:(e.clientY-r.top)*mc.height/r.height};
+}
+function hitSticker(px,py){
+  for(let i=stickers.length-1;i>=0;i--){
+    const s=stickers[i], {w,h}=stickerDims(s);
+    const a=-s.rot*Math.PI/180;
+    const dx=px-s.x, dy=py-s.y;
+    const lx=dx*Math.cos(a)-dy*Math.sin(a), ly=dx*Math.sin(a)+dy*Math.cos(a);
+    if(Math.abs(lx)<w/2+6 && Math.abs(ly)<h/2+6) return i;
+  }
+  return -1;
+}
+$('mainCanvas').addEventListener('pointerdown',e=>{
+  if(!freeMode) return;
+  const {x,y}=canvasPos(e);
+  const i=hitSticker(x,y);
+  selStk=i;
+  if(i>=0){
+    dragging=true; dragDX=x-stickers[i].x; dragDY=y-stickers[i].y;
+    $('stkSize').value=stickers[i].w; $('stkRot').value=stickers[i].rot;
+    $('mainCanvas').setPointerCapture(e.pointerId);
+  }
+  renderFree();
+});
+$('mainCanvas').addEventListener('pointermove',e=>{
+  if(!freeMode||!dragging||selStk<0) return;
+  const {x,y}=canvasPos(e);
+  stickers[selStk].x=x-dragDX; stickers[selStk].y=y-dragDY;
+  renderFree();
+});
+$('mainCanvas').addEventListener('pointerup',()=>{ dragging=false; });
 
 /* ----- zone image + détourage ----- */
 const dz=$('dropZone');
@@ -1480,6 +1640,7 @@ $('tolRange').addEventListener('change',reprocessImage);
 
 /* ----- rendu de l'aperçu principal ----- */
 function renderMain(){
+  if(freeMode){ renderFree(); return; }
   const mc=$('mainCanvas'), ctx=mc.getContext('2d');
   if(!current){ ctx.clearRect(0,0,mc.width,mc.height); return; }
   const isT = current.kind==='tshirt';
@@ -1551,6 +1712,18 @@ $('genBtn').addEventListener('click',()=>{
 
 /* ----- génération depuis image ----- */
 $('genImgBtn').addEventListener('click',()=>{
+  if($('placementSel').value==='libre'){
+    // fige le montage stickers + fond dans la galerie
+    if(!freeMode) enterFree();
+    const baked=bakeFree(false);
+    const item={canvas:baked, kind:curType, seed:null,
+      name:`${curType}-libre-${Date.now()%1e6}.png`};
+    addToGallery(item);
+    current=item;
+    freeBase=baked; stickers=[]; selStk=-1; // le montage devient le nouveau fond
+    renderFree();
+    return;
+  }
   if(!processedImg){ dz.style.borderColor='var(--danger)'; setTimeout(()=>dz.style.borderColor='',900); return; }
   const g=generateFromImage(curType, processedImg, $('placementSel').value, $('logoBase').value, parseInt($('logoScale').value,10), $('shadowChk').checked);
   const item={canvas:g.canvas, kind:curType, seed:null,

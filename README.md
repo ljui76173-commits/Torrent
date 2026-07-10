@@ -31,8 +31,10 @@ Des **vrais styles de vêtements**, dont les tendances :
 Dépose n'importe quelle image (logo, dessin, même une photo) :
 - ✂️ **Suppression automatique du fond** (sensibilité réglable) + recadrage sur le motif
 - Placements : **logo poitrine** (ombre portée), **logo devant + dos**,
-  **motif répété** (tissu imprimé, taille réglable), **image continue par partie du corps**,
-  ou étirée sur tout le template
+  🎯 **placement libre** — glisse tes images directement sur l'aperçu (déplacement à la
+  souris, taille, rotation, duplication, plusieurs stickers superposables, et le fond peut
+  être un design généré en mode auto), **motif répété** (tissu imprimé, taille réglable),
+  **image continue par partie du corps**, ou étirée sur tout le template
 - Ombres réalistes optionnelles sur le vêtement
 
 ### Couverture garantie des épaules
