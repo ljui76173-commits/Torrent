@@ -203,6 +203,10 @@
         </select>
       </div>
 
+      <div class="field" id="armContField" style="display:none">
+        <label class="check" style="margin:0"><input type="checkbox" id="armContChk"> Prolonger le print sur les bras (expérimental, en attente de calibration)</label>
+      </div>
+
       <div id="freeOpts" style="display:none">
         <button class="btn ghost" id="addStickerBtn" style="margin-bottom:10px">➕ Poser l'image sélectionnée en calque</button>
         <div class="field">
@@ -2573,53 +2577,63 @@ function generateFromImage(kind, img, placement, baseHex, logoScale, shadows){
       sw=Math.max(1,Math.min(iw-sx,sw)); sh=Math.max(1,Math.min(ih-sy,sh));
       ctx.drawImage(img, sx,sy,sw,sh, dx,dy,dw,dh);
     };
-    // couleur du tissu : moyenne des pixels proches de la luminance médiane (exclut le print)
-    const fab=(()=>{
-      const c=document.createElement('canvas');
-      const w=Math.max(1,Math.min(128,iw)), h=Math.max(1,Math.min(128,ih));
-      c.width=w; c.height=h;
+    // 1) carré de tissu propre : fenêtre la plus homogène de la photo (sans print),
+    //    tuilé en miroir partout -> couleur ET texture identiques au devant
+    const patch=(()=>{
+      const w=Math.max(2,Math.min(300,iw)), h=Math.max(2,Math.min(300,ih));
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
       const x=c.getContext('2d'); x.drawImage(img,0,0,w,h);
       const d=x.getImageData(0,0,w,h).data;
-      const lums=[];
-      for(let i=0;i<d.length;i+=4) if(d[i+3]>200) lums.push(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]);
-      lums.sort((a,b)=>a-b);
-      const med=lums[lums.length>>1]||128;
-      let r=0,g=0,b=0,n=0;
-      for(let i=0;i<d.length;i+=4){
-        if(d[i+3]<=200) continue;
-        const L=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
-        if(Math.abs(L-med)<30){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; n++; }
+      const P=36; let best=null, bestVar=Infinity;
+      for(let py=0;py+P<=h;py+=12) for(let px=0;px+P<=w;px+=12){
+        let s=0,s2=0,n=0,ok=true;
+        for(let yy=py;yy<py+P && ok;yy+=3) for(let xx=px;xx<px+P;xx+=3){
+          const i=(yy*w+xx)*4;
+          if(d[i+3]<200){ ok=false; break; }
+          const L=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+          s+=L; s2+=L*L; n++;
+        }
+        if(!ok||n<40) continue;
+        const v=s2/n-(s/n)*(s/n);
+        if(v<bestVar){ bestVar=v; best={px:px*iw/w, py:py*ih/h, sz:P*iw/w}; }
       }
-      return n? `rgb(${(r/n)|0},${(g/n)|0},${(b/n)|0})` : '#3a5b85';
+      if(!best) best={px:iw*0.4, py:ih*0.5, sz:Math.max(8,Math.min(iw,ih)*0.12)};
+      const T=document.createElement('canvas'); T.width=T.height=128;
+      const o=T.getContext('2d');
+      o.drawImage(img,best.px,best.py,best.sz,best.sz,0,0,64,64);
+      o.save(); o.scale(-1,1);  o.drawImage(img,best.px,best.py,best.sz,best.sz,-128,0,64,64);   o.restore();
+      o.save(); o.scale(1,-1);  o.drawImage(img,best.px,best.py,best.sz,best.sz,0,-128,64,64);   o.restore();
+      o.save(); o.scale(-1,-1); o.drawImage(img,best.px,best.py,best.sz,best.sz,-128,-128,64,64); o.restore();
+      return {tile:T, srcSz:best.sz};
     })();
-    // base : tissu uni partout + léger modelé
-    for(const z of ZONE_LIST){
-      ctx.fillStyle=fab; ctx.fillRect(z.x,z.y,z.w,z.h);
-      const g=ctx.createLinearGradient(0,z.y,0,z.y+z.h);
-      g.addColorStop(0,'rgba(255,255,255,0.05)'); g.addColorStop(1,'rgba(0,0,0,0.10)');
-      ctx.fillStyle=g; ctx.fillRect(z.x,z.y,z.w,z.h);
-    }
+    // grain du tissu à la même échelle que le mapping du devant
+    const frontScale = kind==='shirt' ? TORSO.front.w/(iw*0.48) : LIMB_L.front.w/(iw*0.38);
+    const tileDest=Math.max(24, patch.srcSz*2*frontScale);
+    for(let ty=0;ty<TH;ty+=tileDest) for(let tx=0;tx<TW;tx+=tileDest)
+      ctx.drawImage(patch.tile, tx, ty, tileDest, tileDest);
+    // 2) print sur le devant uniquement
     if(kind==='shirt'){
-      // crop du torse dans la photo
       const sx=iw*0.26, sw=iw*0.48, sy=ih*0.04, sh=ih*0.92;
       crop(sx,sy,sw,sh, TORSO.front.x,TORSO.front.y,TORSO.front.w,TORSO.front.h);
-      // avants des bras : tranches adjacentes à ÉCHELLE IDENTIQUE
-      // (le bras fait 64 px pour 128 de torse -> tranche source moitié moins large, même hauteur)
-      const sideW=sw*0.5;
-      crop(sx-sideW, sy, sideW, sh, LIMB_L.front.x,LIMB_L.front.y,LIMB_L.front.w,LIMB_L.front.h);
-      crop(sx+sw,    sy, sideW, sh, LIMB_R.front.x,LIMB_R.front.y,LIMB_R.front.w,LIMB_R.front.h);
-      // dos et côtés : tissu uni (déjà posé), léger assombrissement du dos
-      ctx.fillStyle='rgba(0,0,0,0.08)';
-      ctx.fillRect(TORSO.back.x,TORSO.back.y,TORSO.back.w,TORSO.back.h);
+      // prolongement sur les bras : optionnel tant que la carte des faces
+      // des bras n'est pas calibrée en jeu
+      if($('armContChk') && $('armContChk').checked){
+        const sideW=sw*0.5;
+        crop(sx-sideW, sy, sideW, sh, LIMB_L.front.x,LIMB_L.front.y,LIMB_L.front.w,LIMB_L.front.h);
+        crop(sx+sw,    sy, sideW, sh, LIMB_R.front.x,LIMB_R.front.y,LIMB_R.front.w,LIMB_R.front.h);
+      }
     } else {
-      // pants : jambes avant depuis les moitiés de photo, dos uni
       crop(iw*0.12, ih*0.01, iw*0.76, ih*0.20, TORSO.front.x,TORSO.front.y,TORSO.front.w,TORSO.front.h);
       crop(iw*0.08, ih*0.20, iw*0.38, ih*0.78, LIMB_L.front.x,LIMB_L.front.y,LIMB_L.front.w,LIMB_L.front.h);
       crop(iw*0.54, ih*0.20, iw*0.38, ih*0.78, LIMB_R.front.x,LIMB_R.front.y,LIMB_R.front.w,LIMB_R.front.h);
-      ctx.fillStyle='rgba(0,0,0,0.08)';
-      ctx.fillRect(TORSO.back.x,TORSO.back.y,TORSO.back.w,TORSO.back.h);
     }
-    if(shadows) edgeAO(ctx); // la photo a déjà son propre éclairage
+    // 3) ombrage volumique généré sur tout le vêtement (photo comprise)
+    if(shadows){
+      shadeFaces(ctx);
+      edgeAO(ctx);
+    }
+    ctx.fillStyle='rgba(0,0,0,0.06)';
+    ctx.fillRect(TORSO.back.x,TORSO.back.y,TORSO.back.w,TORSO.back.h);
   } else if(placement==='faces'){
     // image continue par partie du corps (torse entier, chaque bras/jambe)
     for(const z of ZONE_LIST) drawCover(ctx,img,z.x,z.y,z.w,z.h);
@@ -2784,6 +2798,7 @@ $('modeTabs').addEventListener('click',e=>{
 $('placementSel').addEventListener('change',()=>{
   const v=$('placementSel').value;
   $('logoOpts').style.display = (v==='logo'||v==='logoback'||v==='tile')?'':'none';
+  $('armContField').style.display = v==='photofront'?'':'none';
   $('freeOpts').style.display = v==='libre'?'':'none';
   $('logoScaleLbl').textContent = v==='tile' ? 'Taille du motif répété' : 'Taille du logo';
   $('logoBaseLbl').textContent = v==='tile' ? 'Couleur de fond' : 'Couleur du vêtement (sous le logo)';
