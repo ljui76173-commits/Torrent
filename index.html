@@ -913,6 +913,65 @@ function drawLaceRing(ctx,cx,cy,r,color){
   }
   ctx.globalAlpha=1;
 }
+/* Print à halo lumineux (aérographe blanc sur noir, façon prints metal/fantôme) */
+function glowPrint(ctx,W,H,drawFn,glowColor,blur){
+  const off=document.createElement('canvas'); off.width=W; off.height=H;
+  const o=off.getContext('2d');
+  o.shadowColor=glowColor||'rgba(255,255,255,0.7)';
+  o.shadowBlur=blur||14;
+  drawFn(o); drawFn(o);          // double passe : halo renforcé
+  o.shadowBlur=0;
+  drawFn(o);                     // cœur net
+  ctx.drawImage(off,0,0);
+}
+/* Logo death-metal illisible : pointes symétriques autour d'une ligne de base */
+function drawMetalLogo(ctx,cx,cy,w,h,rng,color){
+  ctx.strokeStyle=color; ctx.lineCap='round';
+  const half=3+Math.floor(rng()*3);
+  for(let i=0;i<=half;i++){
+    for(const m of (i===0?[1]:[-1,1])){
+      const t=i/half;
+      const x=cx+m*t*w*0.5;
+      const hh=h*(0.55+0.45*(1-t));   // plus haut au centre
+      ctx.lineWidth=2+rng()*0.8;
+      ctx.beginPath();
+      ctx.moveTo(x, cy+h*0.22);
+      ctx.lineTo(x+m*(rng()-0.3)*7, cy-hh*0.62);
+      ctx.stroke();
+      for(let k=0;k<3;k++){          // épines latérales
+        ctx.lineWidth=1.2+rng()*0.8;
+        const y0=cy-hh*0.55+rng()*hh*0.7;
+        ctx.beginPath();
+        ctx.moveTo(x,y0);
+        ctx.lineTo(x+m*(4+rng()*11), y0-(3+rng()*9));
+        ctx.stroke();
+      }
+      if(rng()<0.5){                 // racines vers le bas
+        ctx.lineWidth=1.4;
+        ctx.beginPath();
+        ctx.moveTo(x, cy+h*0.22);
+        ctx.lineTo(x+m*(3+rng()*7), cy+h*0.42+rng()*h*0.12);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.lineWidth=2.2;                 // ligne de base + pointes extrêmes
+  ctx.beginPath(); ctx.moveTo(cx-w*0.55,cy+2); ctx.lineTo(cx+w*0.55,cy+2); ctx.stroke();
+  for(const m of [-1,1]){
+    ctx.beginPath();
+    ctx.moveTo(cx+m*w*0.55, cy+2);
+    ctx.lineTo(cx+m*w*0.78, cy-(6+rng()*10));
+    ctx.stroke();
+  }
+}
+function drawChainNecklace(ctx){
+  const fr=TORSO.front;
+  ctx.strokeStyle='#c9c9d2'; ctx.lineWidth=1.8;
+  for(let i=0;i<=10;i++){
+    const t=i/10, x=fr.x+fr.w*0.2+t*fr.w*0.6, y=fr.y+2+Math.sin(t*Math.PI)*13;
+    ctx.beginPath(); ctx.arc(x,y,2.6,0,7); ctx.stroke();
+  }
+}
 function fakeGlyphs(ctx,x,y,n,size,color,rng){
   // fausse rangée de caractères type katakana
   ctx.strokeStyle=color; ctx.lineWidth=Math.max(1.5,size*0.14); ctx.lineCap='square';
@@ -1587,6 +1646,75 @@ const SHIRT_STYLES = {
       }
     },
     noise:1800, noiseAlpha:0.05},
+  metal: {label:'🤘 Metal (print glow)', fabric:'solid',
+    palette:paletteFrom([['#141416','#e8e8ee'],['#17171a','#d8d8e2'],['#101014','#c9c9d6']]),
+    paint(ctx,p,rng){
+      const fr=TORSO.front, bk=TORSO.back;
+      const ghostMode=rng()<0.45;
+      glowPrint(ctx,TW,TH,o=>{
+        if(ghostMode) // fantôme blanc aérographe
+          drawGhost(o, fr.x+fr.w/2+(rng()-0.5)*10, fr.y+62, 86+rng()*14,
+            'rgba(238,238,246,0.92)', 'rgba(16,16,20,0.95)');
+        else
+          drawMetalLogo(o, fr.x+fr.w/2, fr.y+56, fr.w*0.82, 76, rng, 'rgba(236,236,244,0.92)');
+        drawMetalLogo(o, bk.x+bk.w/2, bk.y+58, bk.w*0.6, 56, rng, 'rgba(236,236,244,0.55)');
+      }, 'rgba(255,255,255,0.55)', 13);
+      drawChainNecklace(ctx);
+      if(rng()<0.5) scatterInFaces(ctx,rng,LIMBS.flatMap(l=>SIDE_FACES.map(f=>l[f])),5,
+        (x,y,r2)=>drawSparkle(ctx,x,y,3+r2()*5,'rgba(230,230,240,0.5)'));
+    },
+    after(ctx,p,rng,opts){ if(tornAllowed(opts) && rng()<0.5) tornHem(ctx,rng); },
+    noise:1400, noiseAlpha:0.04},
+  costard: {label:'🎩 Old money (costume rayé)', fabric:'solid',
+    palette:paletteFrom([['#23262e','#c9a24a'],['#1e222b','#8a2f38'],['#2a2d34','#b8b8c2']]),
+    paint(ctx,p,rng){
+      // fines rayures tennis sur tout le costume
+      ctx.fillStyle='rgba(255,255,255,0.20)';
+      for(const z of ZONE_LIST) for(let x=z.x+3;x<z.x+z.w;x+=9) ctx.fillRect(x,z.y,1.6,z.h);
+      const fr=TORSO.front, cx=fr.x+fr.w/2;
+      // chemise dans l'ouverture en V
+      const shirtCol=pick(rng,['#d9b64a','#e8e2d2','#b8ccd9','#c9a8b8']);
+      ctx.fillStyle=shirtCol;
+      ctx.beginPath();
+      ctx.moveTo(cx-20,fr.y); ctx.lineTo(cx,fr.y+34); ctx.lineTo(cx+20,fr.y);
+      ctx.closePath(); ctx.fill();
+      // cravate rayée + nœud
+      const tieCol=pick(rng,['#7a2430','#24427a','#2f5d46','#3a3a40']);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(cx-5,fr.y+8); ctx.lineTo(cx+5,fr.y+8);
+      ctx.lineTo(cx+7,fr.y+62); ctx.lineTo(cx,fr.y+72); ctx.lineTo(cx-7,fr.y+62);
+      ctx.closePath();
+      ctx.fillStyle=tieCol; ctx.fill(); ctx.clip();
+      ctx.strokeStyle='rgba(201,162,74,0.8)'; ctx.lineWidth=3;
+      for(let y=fr.y+4;y<fr.y+80;y+=9){
+        ctx.beginPath(); ctx.moveTo(cx-10,y+8); ctx.lineTo(cx+10,y); ctx.stroke();
+      }
+      ctx.restore();
+      ctx.fillStyle=tieCol; ctx.fillRect(cx-6,fr.y+1,12,9);
+      // revers du costume par-dessus
+      ctx.fillStyle=p.darker;
+      ctx.beginPath(); ctx.moveTo(cx-27,fr.y); ctx.lineTo(cx-4,fr.y+36); ctx.lineTo(cx-14,fr.y+42); ctx.lineTo(cx-32,fr.y+8); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx+27,fr.y); ctx.lineTo(cx+4,fr.y+36); ctx.lineTo(cx+14,fr.y+42); ctx.lineTo(cx+32,fr.y+8); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(cx-27,fr.y); ctx.lineTo(cx-4,fr.y+36); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx+27,fr.y); ctx.lineTo(cx+4,fr.y+36); ctx.stroke();
+      // pochette costume
+      ctx.fillStyle=shirtCol;
+      ctx.beginPath(); ctx.moveTo(fr.x+16,fr.y+42); ctx.lineTo(fr.x+34,fr.y+42); ctx.lineTo(fr.x+25,fr.y+36); ctx.closePath(); ctx.fill();
+      // boutons + ceinture
+      ctx.fillStyle='#c9c9d2';
+      ctx.beginPath(); ctx.arc(cx-2,fr.y+82,2.5,0,7); ctx.arc(cx-2,fr.y+98,2.5,0,7); ctx.fill();
+      for(const f of SIDE_FACES) band(ctx,TORSO[f],'#101014',9,true);
+      ctx.fillStyle='#c9c9d2'; ctx.fillRect(cx-6,fr.y+fr.h-8,12,7);
+      ctx.fillStyle='#101014'; ctx.fillRect(cx-3,fr.y+fr.h-6.5,6,4);
+      // boutons de manche
+      ctx.fillStyle='#c9c9d2';
+      for(const limb of LIMBS){
+        const r=limb.front;
+        ctx.beginPath(); ctx.arc(r.x+r.w/2+14,r.y+r.h-10,1.8,0,7); ctx.arc(r.x+r.w/2+14,r.y+r.h-17,1.8,0,7); ctx.fill();
+      }
+    }},
   street: {label:'🔥 Streetwear', fabric:'solid',
     palette(rng,forced){
       this._v=Math.floor(rng()*3); // 0: maillot technique, 1: dents xerox, 2: numéros
@@ -1725,6 +1853,74 @@ const PANTS_STYLES = {
       ctx.fillStyle='rgba(0,0,0,0.3)';
       ctx.fillRect(bk.x+18,bk.y+30,30,4); ctx.fillRect(bk.x+bk.w-48,bk.y+30,30,4);
       for(const limb of LIMBS) for(const f of SIDE_FACES) band(ctx,limb[f],p.dark,5,true,0.55);
+    }},
+  baggy: {label:'🖤 Baggy (satin)', fabric:'solid',
+    palette:paletteFrom([['#141416','#8a8a96'],['#101013','#6a6a76'],['#16161a','#9a9aa8']]),
+    clothStrength:0.09,
+    paint(ctx,p,rng){
+      // ceinture noire cloutée métal
+      for(const f of SIDE_FACES) band(ctx,TORSO[f],'#0b0b0d',13,false);
+      ctx.fillStyle='#0b0b0d'; const zt=ZONES.torso; ctx.fillRect(zt.x,2,zt.w,70);
+      ctx.fillStyle='#c9c9d2';
+      for(const f of ['front','back']){
+        const r=TORSO[f];
+        for(let x=r.x+8;x<r.x+r.w-6;x+=12) ctx.fillRect(x,r.y+4.5,4,4);
+      }
+      // reflets satin : bandes verticales lumineuses
+      for(const part of [TORSO,LIMB_L,LIMB_R]) for(const f of SIDE_FACES){
+        const r=part[f];
+        const g=ctx.createLinearGradient(r.x,0,r.x+r.w,0);
+        g.addColorStop(0,'rgba(255,255,255,0)');
+        g.addColorStop(0.3+rng()*0.1,'rgba(255,255,255,0.15)');
+        g.addColorStop(0.5,'rgba(255,255,255,0.02)');
+        g.addColorStop(0.68+rng()*0.1,'rgba(255,255,255,0.11)');
+        g.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.fillStyle=g; ctx.fillRect(r.x,r.y,r.w,r.h);
+      }
+      // délavage brun très léger (usure du noir)
+      ctx.fillStyle='rgba(122,92,58,0.07)';
+      for(let i=0;i<10;i++){
+        const z=pick(rng,[ZONES.limbL,ZONES.limbR]);
+        ctx.fillRect(z.x+rng()*z.w, 360+rng()*100, 4+rng()*10, 30+rng()*60);
+      }
+      // poches
+      const fr=TORSO.front;
+      ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(fr.x+8,fr.y+16); ctx.quadraticCurveTo(fr.x+32,fr.y+24,fr.x+34,fr.y+52); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fr.x+fr.w-8,fr.y+16); ctx.quadraticCurveTo(fr.x+fr.w-32,fr.y+24,fr.x+fr.w-34,fr.y+52); ctx.stroke();
+      // revers roulé en bas de jambe
+      for(const limb of LIMBS) for(const f of SIDE_FACES){
+        const r=limb[f];
+        ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.fillRect(r.x,r.y+r.h-16,r.w,16);
+        ctx.fillStyle='rgba(0,0,0,0.45)'; ctx.fillRect(r.x,r.y+r.h-18,r.w,2.5);
+        ctx.fillStyle='rgba(255,255,255,0.14)'; ctx.fillRect(r.x,r.y+r.h-15,r.w,1.5);
+      }
+    }},
+  costard: {label:'🎩 Old money (rayures)', fabric:'solid',
+    palette:paletteFrom([['#23262e','#c9a24a'],['#1e222b','#8a2f38'],['#2a2d34','#b8b8c2']]),
+    paint(ctx,p,rng){
+      // fines rayures tennis
+      ctx.fillStyle='rgba(255,255,255,0.20)';
+      for(const z of ZONE_LIST) for(let x=z.x+3;x<z.x+z.w;x+=9) ctx.fillRect(x,z.y,1.6,z.h);
+      // ceinture noire + boucle argent
+      for(const f of SIDE_FACES) band(ctx,TORSO[f],'#101014',10,false);
+      ctx.fillStyle='#101014'; const zt=ZONES.torso; ctx.fillRect(zt.x,2,zt.w,70);
+      const fr=TORSO.front, cx=fr.x+fr.w/2;
+      ctx.fillStyle='#c9c9d2'; ctx.fillRect(cx-6,fr.y+1.5,12,7);
+      ctx.fillStyle='#101014'; ctx.fillRect(cx-3,fr.y+3,6,4);
+      // pli de repassage lumineux
+      ctx.fillStyle='rgba(255,255,255,0.14)';
+      for(const limb of LIMBS){ const r=limb.front; ctx.fillRect(r.x+r.w/2-1,r.y,2,r.h); }
+      // poches passepoilées
+      const bk=TORSO.back;
+      ctx.fillStyle='rgba(0,0,0,0.35)';
+      ctx.fillRect(bk.x+18,bk.y+28,30,3.5); ctx.fillRect(bk.x+bk.w-48,bk.y+28,30,3.5);
+      // revers de bas de jambe
+      for(const limb of LIMBS) for(const f of SIDE_FACES){
+        const r=limb[f];
+        ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(r.x,r.y+r.h-9,r.w,9);
+        ctx.fillStyle='rgba(255,255,255,0.10)'; ctx.fillRect(r.x,r.y+r.h-9,r.w,1.5);
+      }
     }},
   emo: {label:'🖤 Emo (skinny + chaîne)', fabric:'solid', palette:EMO_P,
     paint(ctx,p,rng){
@@ -1927,6 +2123,19 @@ const TSHIRT_STYLES = {
       ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+len,y+(rng()-.5)*8); ctx.stroke();
     }
   }},
+  metal: {label:'🤘 Metal (print glow)',
+    palette:paletteFrom([['#141416','#e8e8ee'],['#101014','#d8d8e2']]),
+    paint(ctx,S,p,rng,opts){
+    ctx.fillStyle=p.base; ctx.fillRect(0,0,S,S);
+    if(!opts.text){
+      const ghostMode=rng()<0.45;
+      glowPrint(ctx,S,S,o=>{
+        if(ghostMode) drawGhost(o,S/2,S*0.45,190,'rgba(238,238,246,0.92)','rgba(16,16,20,0.95)');
+        else drawMetalLogo(o,S/2,S*0.44,S*0.8,S*0.4,rng,'rgba(236,236,244,0.92)');
+      }, 'rgba(255,255,255,0.55)', 26);
+    }
+    for(let i=0;i<6;i++) drawSparkle(ctx,rng()*S,rng()*S,5+rng()*9,'rgba(230,230,240,0.4)');
+  }},
   tiedye: {label:'Tie-dye', paint(ctx,S,p,rng){ PATTERNS.tiedye(ctx,S,S,p,rng); }},
   camo: {label:'Camouflage', paint(ctx,S,p,rng){ PATTERNS.camo(ctx,S,S,p,rng); }},
 };
@@ -2025,6 +2234,7 @@ const MATCH_PANTS={
   tee:'jean', hoodie:'jogging', varsity:'jean', jersey:'jogging',
   chemise:'costume', pull:'jean', emo:'emo', y2k:'y2k',
   kawaii:'kawaii', grunge:'grunge', street:'cargo',
+  metal:'baggy', costard:'costard',
 };
 
 function generateTShirt(opts){
@@ -2741,6 +2951,9 @@ const NAME_WORDS={
   kawaii:['kawaii','mochi','sweetie','pastel','bunny','cutie'],
   grunge:['grunge','riot','90s','wasted','faded','misery'],
   street:['street','drip','urban','og','hype','wavy'],
+  metal:['metal','doom','abyss','requiem','occult'],
+  costard:['old money','tailored','heir','riviera','gentleman'],
+  baggy:['baggy','satin','midnight','wide'],
   jean:['denim','classic','vintage'], jogging:['cozy','sporty','chill'],
   hoodie:['cozy','oversized','soft'], jersey:['team','pro','mvp'],
   default:['classic','essential','og','daily','core'],
