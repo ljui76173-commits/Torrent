@@ -1646,68 +1646,94 @@ const SHIRT_STYLES = {
       }
     },
     noise:1800, noiseAlpha:0.05},
-  metal: {label:'🤘 Metal (print glow)', fabric:'solid',
-    palette:paletteFrom([['#141416','#e8e8ee'],['#17171a','#d8d8e2'],['#101014','#c9c9d6']]),
+  metal: {label:'🖤 Veste cuir', fabric:'solid', clothStrength:0.07,
+    palette:paletteFrom([['#141416','#8a8a96'],['#17171a','#6a6a76'],['#101014','#9a9aa8']]),
     paint(ctx,p,rng){
-      const fr=TORSO.front, bk=TORSO.back;
-      const ghostMode=rng()<0.45;
-      glowPrint(ctx,TW,TH,o=>{
-        if(ghostMode) // fantôme blanc aérographe
-          drawGhost(o, fr.x+fr.w/2+(rng()-0.5)*10, fr.y+62, 86+rng()*14,
-            'rgba(238,238,246,0.92)', 'rgba(16,16,20,0.95)');
-        else
-          drawMetalLogo(o, fr.x+fr.w/2, fr.y+56, fr.w*0.82, 76, rng, 'rgba(236,236,244,0.92)');
-        drawMetalLogo(o, bk.x+bk.w/2, bk.y+58, bk.w*0.6, 56, rng, 'rgba(236,236,244,0.55)');
-      }, 'rgba(255,255,255,0.55)', 13);
-      drawChainNecklace(ctx);
-      if(rng()<0.5) scatterInFaces(ctx,rng,LIMBS.flatMap(l=>SIDE_FACES.map(f=>l[f])),5,
-        (x,y,r2)=>drawSparkle(ctx,x,y,3+r2()*5,'rgba(230,230,240,0.5)'));
-    },
-    after(ctx,p,rng,opts){ if(tornAllowed(opts) && rng()<0.5) tornHem(ctx,rng); },
-    noise:1400, noiseAlpha:0.04},
-  costard: {label:'🎩 Old money (costume rayé)', fabric:'solid',
-    palette:paletteFrom([['#23262e','#c9a24a'],['#1e222b','#8a2f38'],['#2a2d34','#b8b8c2']]),
-    paint(ctx,p,rng){
-      // fines rayures tennis sur tout le costume
-      ctx.fillStyle='rgba(255,255,255,0.20)';
-      for(const z of ZONE_LIST) for(let x=z.x+3;x<z.x+z.w;x+=9) ctx.fillRect(x,z.y,1.6,z.h);
       const fr=TORSO.front, cx=fr.x+fr.w/2;
-      // chemise dans l'ouverture en V
-      const shirtCol=pick(rng,['#d9b64a','#e8e2d2','#b8ccd9','#c9a8b8']);
+      // reflets cuir : bandes verticales lumineuses sur torse et manches
+      for(const part of [TORSO,LIMB_L,LIMB_R]) for(const f of SIDE_FACES){
+        const r=part[f];
+        const g=ctx.createLinearGradient(r.x,0,r.x+r.w,0);
+        g.addColorStop(0,'rgba(255,255,255,0)');
+        g.addColorStop(0.28+rng()*0.1,'rgba(255,255,255,0.17)');
+        g.addColorStop(0.5,'rgba(255,255,255,0.02)');
+        g.addColorStop(0.7+rng()*0.08,'rgba(255,255,255,0.12)');
+        g.addColorStop(1,'rgba(255,255,255,0)');
+        ctx.fillStyle=g; ctx.fillRect(r.x,r.y,r.w,r.h);
+      }
+      // zip central argenté
+      ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(cx-3,fr.y,6,fr.h);
+      ctx.strokeStyle='#b8b8c2'; ctx.lineWidth=1.5; ctx.setLineDash([2.5,2]);
+      ctx.beginPath(); ctx.moveTo(cx,fr.y+2); ctx.lineTo(cx,fr.y+fr.h-2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle='#c9c9d2'; ctx.fillRect(cx-2.5,fr.y+12,5,8); // curseur
+      // zips diagonaux de poitrine
+      ctx.strokeStyle='#9a9aa4'; ctx.lineWidth=2;
+      ctx.beginPath(); ctx.moveTo(fr.x+14,fr.y+34); ctx.lineTo(fr.x+42,fr.y+56); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fr.x+fr.w-14,fr.y+34); ctx.lineTo(fr.x+fr.w-42,fr.y+56); ctx.stroke();
+      // col rabattu
+      ctx.fillStyle='#0c0c0e';
+      ctx.beginPath(); ctx.moveTo(cx-30,fr.y); ctx.lineTo(cx-4,fr.y); ctx.lineTo(cx-16,fr.y+16); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx+30,fr.y); ctx.lineTo(cx+4,fr.y); ctx.lineTo(cx+16,fr.y+16); ctx.closePath(); ctx.fill();
+      ctx.fillStyle='#c9c9d2'; // pressions du col
+      ctx.beginPath(); ctx.arc(cx-24,fr.y+6,1.8,0,7); ctx.arc(cx+24,fr.y+6,1.8,0,7); ctx.fill();
+      // ceinture bas de veste + boucle
+      for(const f of SIDE_FACES) band(ctx,TORSO[f],'#0b0b0d',10,true);
+      ctx.fillStyle='#c9c9d2'; ctx.fillRect(cx-6,fr.y+fr.h-9,12,8);
+      ctx.fillStyle='#0b0b0d'; ctx.fillRect(cx-3,fr.y+fr.h-7,6,4);
+      // poignets zippés
+      for(const limb of LIMBS) for(const f of SIDE_FACES) band(ctx,limb[f],'#0c0c0e',8,true);
+      if(rng()<0.5) drawChainNecklace(ctx);
+    },
+    noise:1200, noiseAlpha:0.035},
+  costard: {label:'🎩 Old money (costume rayé)', fabric:'solid',
+    palette:paletteFrom([['#191c24','#c9a24a'],['#15181f','#8a2f38'],['#1c1f27','#b8b8c2']]),
+    paint(ctx,p,rng){
+      // fines rayures tennis discrètes (le rendu en jeu éclaircit déjà beaucoup)
+      ctx.fillStyle='rgba(255,255,255,0.11)';
+      for(const z of ZONE_LIST) for(let x=z.x+4;x<z.x+z.w;x+=8) ctx.fillRect(x,z.y,1.2,z.h);
+      const fr=TORSO.front, cx=fr.x+fr.w/2;
+      // chemise dans l'ouverture en V (plus large et plus profonde)
+      const shirtCol=pick(rng,['#d9b64a','#e8e2d2','#b8ccd9']);
       ctx.fillStyle=shirtCol;
       ctx.beginPath();
-      ctx.moveTo(cx-20,fr.y); ctx.lineTo(cx,fr.y+34); ctx.lineTo(cx+20,fr.y);
+      ctx.moveTo(cx-24,fr.y); ctx.lineTo(cx,fr.y+46); ctx.lineTo(cx+24,fr.y);
       ctx.closePath(); ctx.fill();
-      // cravate rayée + nœud
+      // pointes de col de chemise
+      ctx.fillStyle=hslStr(hexToHsl(shirtCol).h, hexToHsl(shirtCol).s, Math.max(20,hexToHsl(shirtCol).l-18));
+      ctx.beginPath(); ctx.moveTo(cx-13,fr.y); ctx.lineTo(cx-2,fr.y); ctx.lineTo(cx-8,fr.y+11); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx+13,fr.y); ctx.lineTo(cx+2,fr.y); ctx.lineTo(cx+8,fr.y+11); ctx.closePath(); ctx.fill();
+      // cravate rayée longue + nœud
       const tieCol=pick(rng,['#7a2430','#24427a','#2f5d46','#3a3a40']);
       ctx.save();
       ctx.beginPath();
-      ctx.moveTo(cx-5,fr.y+8); ctx.lineTo(cx+5,fr.y+8);
-      ctx.lineTo(cx+7,fr.y+62); ctx.lineTo(cx,fr.y+72); ctx.lineTo(cx-7,fr.y+62);
+      ctx.moveTo(cx-6,fr.y+9); ctx.lineTo(cx+6,fr.y+9);
+      ctx.lineTo(cx+9,fr.y+78); ctx.lineTo(cx,fr.y+90); ctx.lineTo(cx-9,fr.y+78);
       ctx.closePath();
       ctx.fillStyle=tieCol; ctx.fill(); ctx.clip();
-      ctx.strokeStyle='rgba(201,162,74,0.8)'; ctx.lineWidth=3;
-      for(let y=fr.y+4;y<fr.y+80;y+=9){
-        ctx.beginPath(); ctx.moveTo(cx-10,y+8); ctx.lineTo(cx+10,y); ctx.stroke();
+      ctx.strokeStyle='rgba(201,162,74,0.85)'; ctx.lineWidth=3.5;
+      for(let y=fr.y+2;y<fr.y+98;y+=10){
+        ctx.beginPath(); ctx.moveTo(cx-12,y+10); ctx.lineTo(cx+12,y); ctx.stroke();
       }
       ctx.restore();
-      ctx.fillStyle=tieCol; ctx.fillRect(cx-6,fr.y+1,12,9);
-      // revers du costume par-dessus
-      ctx.fillStyle=p.darker;
-      ctx.beginPath(); ctx.moveTo(cx-27,fr.y); ctx.lineTo(cx-4,fr.y+36); ctx.lineTo(cx-14,fr.y+42); ctx.lineTo(cx-32,fr.y+8); ctx.closePath(); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(cx+27,fr.y); ctx.lineTo(cx+4,fr.y+36); ctx.lineTo(cx+14,fr.y+42); ctx.lineTo(cx+32,fr.y+8); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=1.5;
-      ctx.beginPath(); ctx.moveTo(cx-27,fr.y); ctx.lineTo(cx-4,fr.y+36); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(cx+27,fr.y); ctx.lineTo(cx+4,fr.y+36); ctx.stroke();
-      // pochette costume
-      ctx.fillStyle=shirtCol;
-      ctx.beginPath(); ctx.moveTo(fr.x+16,fr.y+42); ctx.lineTo(fr.x+34,fr.y+42); ctx.lineTo(fr.x+25,fr.y+36); ctx.closePath(); ctx.fill();
-      // boutons + ceinture
+      ctx.fillStyle=tieCol;
+      ctx.beginPath();
+      ctx.moveTo(cx-7,fr.y+1); ctx.lineTo(cx+7,fr.y+1); ctx.lineTo(cx+5,fr.y+11); ctx.lineTo(cx-5,fr.y+11);
+      ctx.closePath(); ctx.fill();
+      // grands revers sombres par-dessus
+      ctx.fillStyle='#0e1015';
+      ctx.beginPath(); ctx.moveTo(cx-34,fr.y); ctx.lineTo(cx-5,fr.y+48); ctx.lineTo(cx-18,fr.y+54); ctx.lineTo(cx-40,fr.y+10); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx+34,fr.y); ctx.lineTo(cx+5,fr.y+48); ctx.lineTo(cx+18,fr.y+54); ctx.lineTo(cx+40,fr.y+10); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(cx-34,fr.y); ctx.lineTo(cx-5,fr.y+48); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(cx+34,fr.y); ctx.lineTo(cx+5,fr.y+48); ctx.stroke();
+      // boutonnage sous la cravate
       ctx.fillStyle='#c9c9d2';
-      ctx.beginPath(); ctx.arc(cx-2,fr.y+82,2.5,0,7); ctx.arc(cx-2,fr.y+98,2.5,0,7); ctx.fill();
-      for(const f of SIDE_FACES) band(ctx,TORSO[f],'#101014',9,true);
+      ctx.beginPath(); ctx.arc(cx-1,fr.y+100,2.2,0,7); ctx.arc(cx-1,fr.y+114,2.2,0,7); ctx.fill();
+      // ceinture + boucle
+      for(const f of SIDE_FACES) band(ctx,TORSO[f],'#0b0c10',9,true);
       ctx.fillStyle='#c9c9d2'; ctx.fillRect(cx-6,fr.y+fr.h-8,12,7);
-      ctx.fillStyle='#101014'; ctx.fillRect(cx-3,fr.y+fr.h-6.5,6,4);
+      ctx.fillStyle='#0b0c10'; ctx.fillRect(cx-3,fr.y+fr.h-6.5,6,4);
       // boutons de manche
       ctx.fillStyle='#c9c9d2';
       for(const limb of LIMBS){
@@ -1897,11 +1923,11 @@ const PANTS_STYLES = {
       }
     }},
   costard: {label:'🎩 Old money (rayures)', fabric:'solid',
-    palette:paletteFrom([['#23262e','#c9a24a'],['#1e222b','#8a2f38'],['#2a2d34','#b8b8c2']]),
+    palette:paletteFrom([['#191c24','#c9a24a'],['#15181f','#8a2f38'],['#1c1f27','#b8b8c2']]),
     paint(ctx,p,rng){
-      // fines rayures tennis
-      ctx.fillStyle='rgba(255,255,255,0.20)';
-      for(const z of ZONE_LIST) for(let x=z.x+3;x<z.x+z.w;x+=9) ctx.fillRect(x,z.y,1.6,z.h);
+      // fines rayures tennis discrètes
+      ctx.fillStyle='rgba(255,255,255,0.11)';
+      for(const z of ZONE_LIST) for(let x=z.x+4;x<z.x+z.w;x+=8) ctx.fillRect(x,z.y,1.2,z.h);
       // ceinture noire + boucle argent
       for(const f of SIDE_FACES) band(ctx,TORSO[f],'#101014',10,false);
       ctx.fillStyle='#101014'; const zt=ZONES.torso; ctx.fillRect(zt.x,2,zt.w,70);
@@ -2122,19 +2148,6 @@ const TSHIRT_STYLES = {
       const x=rng()*S,y=rng()*S,len=10+rng()*30;
       ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+len,y+(rng()-.5)*8); ctx.stroke();
     }
-  }},
-  metal: {label:'🤘 Metal (print glow)',
-    palette:paletteFrom([['#141416','#e8e8ee'],['#101014','#d8d8e2']]),
-    paint(ctx,S,p,rng,opts){
-    ctx.fillStyle=p.base; ctx.fillRect(0,0,S,S);
-    if(!opts.text){
-      const ghostMode=rng()<0.45;
-      glowPrint(ctx,S,S,o=>{
-        if(ghostMode) drawGhost(o,S/2,S*0.45,190,'rgba(238,238,246,0.92)','rgba(16,16,20,0.95)');
-        else drawMetalLogo(o,S/2,S*0.44,S*0.8,S*0.4,rng,'rgba(236,236,244,0.92)');
-      }, 'rgba(255,255,255,0.55)', 26);
-    }
-    for(let i=0;i<6;i++) drawSparkle(ctx,rng()*S,rng()*S,5+rng()*9,'rgba(230,230,240,0.4)');
   }},
   tiedye: {label:'Tie-dye', paint(ctx,S,p,rng){ PATTERNS.tiedye(ctx,S,S,p,rng); }},
   camo: {label:'Camouflage', paint(ctx,S,p,rng){ PATTERNS.camo(ctx,S,S,p,rng); }},
