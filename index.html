@@ -2565,33 +2565,59 @@ function generateFromImage(kind, img, placement, baseHex, logoScale, shadows){
     ctx.drawImage(img,0,0,TW,TH);
     doShade();
   } else if(placement==='photofront'){
-    // photo de vêtement à plat : torse au centre, manches/jambes sur les côtés
+    // photo de vêtement à plat : print devant uniquement, dos et côtés en tissu uni,
+    // et continuité du print sur l'avant des bras à échelle identique
     const iw=img.width, ih=img.height;
-    const crop=(sx,sy,sw,sh,dx,dy,dw,dh)=>ctx.drawImage(img, sx,sy,Math.max(1,sw),Math.max(1,sh), dx,dy,dw,dh);
+    const crop=(sx,sy,sw,sh,dx,dy,dw,dh)=>{
+      sx=Math.max(0,Math.min(iw-1,sx)); sy=Math.max(0,Math.min(ih-1,sy));
+      sw=Math.max(1,Math.min(iw-sx,sw)); sh=Math.max(1,Math.min(ih-sy,sh));
+      ctx.drawImage(img, sx,sy,sw,sh, dx,dy,dw,dh);
+    };
+    // couleur du tissu : moyenne des pixels proches de la luminance médiane (exclut le print)
+    const fab=(()=>{
+      const c=document.createElement('canvas');
+      const w=Math.max(1,Math.min(128,iw)), h=Math.max(1,Math.min(128,ih));
+      c.width=w; c.height=h;
+      const x=c.getContext('2d'); x.drawImage(img,0,0,w,h);
+      const d=x.getImageData(0,0,w,h).data;
+      const lums=[];
+      for(let i=0;i<d.length;i+=4) if(d[i+3]>200) lums.push(0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]);
+      lums.sort((a,b)=>a-b);
+      const med=lums[lums.length>>1]||128;
+      let r=0,g=0,b=0,n=0;
+      for(let i=0;i<d.length;i+=4){
+        if(d[i+3]<=200) continue;
+        const L=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+        if(Math.abs(L-med)<30){ r+=d[i]; g+=d[i+1]; b+=d[i+2]; n++; }
+      }
+      return n? `rgb(${(r/n)|0},${(g/n)|0},${(b/n)|0})` : '#3a5b85';
+    })();
+    // base : tissu uni partout + léger modelé
+    for(const z of ZONE_LIST){
+      ctx.fillStyle=fab; ctx.fillRect(z.x,z.y,z.w,z.h);
+      const g=ctx.createLinearGradient(0,z.y,0,z.y+z.h);
+      g.addColorStop(0,'rgba(255,255,255,0.05)'); g.addColorStop(1,'rgba(0,0,0,0.10)');
+      ctx.fillStyle=g; ctx.fillRect(z.x,z.y,z.w,z.h);
+    }
     if(kind==='shirt'){
-      const zt=ZONES.torso;
-      // torse : bande centrale de la photo étirée sur toute la zone (gouttières comprises)
-      crop(iw*0.26, ih*0.02, iw*0.48, ih*0.96, zt.x, zt.y, zt.w, zt.h);
-      // faces avant/dos redessinées proprement
-      crop(iw*0.27, ih*0.05, iw*0.46, ih*0.90, TORSO.front.x, TORSO.front.y, TORSO.front.w, TORSO.front.h);
-      crop(iw*0.27, ih*0.05, iw*0.46, ih*0.90, TORSO.back.x, TORSO.back.y, TORSO.back.w, TORSO.back.h);
-      ctx.fillStyle='rgba(0,0,0,0.14)';
-      ctx.fillRect(TORSO.back.x, TORSO.back.y, TORSO.back.w, TORSO.back.h);
-      // manches : côtés de la photo vers chaque croix de bras
-      crop(0,        ih*0.06, iw*0.25, ih*0.86, ZONES.limbL.x, ZONES.limbL.y, ZONES.limbL.w, ZONES.limbL.h);
-      crop(iw*0.75,  ih*0.06, iw*0.25, ih*0.86, ZONES.limbR.x, ZONES.limbR.y, ZONES.limbR.w, ZONES.limbR.h);
-      crop(iw*0.02,  ih*0.08, iw*0.21, ih*0.82, LIMB_L.front.x, LIMB_L.front.y, LIMB_L.front.w, LIMB_L.front.h);
-      crop(iw*0.77,  ih*0.08, iw*0.21, ih*0.82, LIMB_R.front.x, LIMB_R.front.y, LIMB_R.front.w, LIMB_R.front.h);
+      // crop du torse dans la photo
+      const sx=iw*0.26, sw=iw*0.48, sy=ih*0.04, sh=ih*0.92;
+      crop(sx,sy,sw,sh, TORSO.front.x,TORSO.front.y,TORSO.front.w,TORSO.front.h);
+      // avants des bras : tranches adjacentes à ÉCHELLE IDENTIQUE
+      // (le bras fait 64 px pour 128 de torse -> tranche source moitié moins large, même hauteur)
+      const sideW=sw*0.5;
+      crop(sx-sideW, sy, sideW, sh, LIMB_L.front.x,LIMB_L.front.y,LIMB_L.front.w,LIMB_L.front.h);
+      crop(sx+sw,    sy, sideW, sh, LIMB_R.front.x,LIMB_R.front.y,LIMB_R.front.w,LIMB_R.front.h);
+      // dos et côtés : tissu uni (déjà posé), léger assombrissement du dos
+      ctx.fillStyle='rgba(0,0,0,0.08)';
+      ctx.fillRect(TORSO.back.x,TORSO.back.y,TORSO.back.w,TORSO.back.h);
     } else {
-      // pants : jambe gauche / jambe droite de la photo, taille en haut
-      const zt=ZONES.torso;
-      crop(iw*0.08, 0, iw*0.84, ih*0.24, zt.x, zt.y, zt.w, zt.h);
-      crop(iw*0.12, ih*0.02, iw*0.76, ih*0.20, TORSO.front.x, TORSO.front.y, TORSO.front.w, TORSO.front.h);
-      crop(iw*0.12, ih*0.02, iw*0.76, ih*0.20, TORSO.back.x, TORSO.back.y, TORSO.back.w, TORSO.back.h);
-      crop(iw*0.05, ih*0.20, iw*0.44, ih*0.78, ZONES.limbL.x, ZONES.limbL.y, ZONES.limbL.w, ZONES.limbL.h);
-      crop(iw*0.51, ih*0.20, iw*0.44, ih*0.78, ZONES.limbR.x, ZONES.limbR.y, ZONES.limbR.w, ZONES.limbR.h);
-      crop(iw*0.08, ih*0.22, iw*0.38, ih*0.74, LIMB_L.front.x, LIMB_L.front.y, LIMB_L.front.w, LIMB_L.front.h);
-      crop(iw*0.54, ih*0.22, iw*0.38, ih*0.74, LIMB_R.front.x, LIMB_R.front.y, LIMB_R.front.w, LIMB_R.front.h);
+      // pants : jambes avant depuis les moitiés de photo, dos uni
+      crop(iw*0.12, ih*0.01, iw*0.76, ih*0.20, TORSO.front.x,TORSO.front.y,TORSO.front.w,TORSO.front.h);
+      crop(iw*0.08, ih*0.20, iw*0.38, ih*0.78, LIMB_L.front.x,LIMB_L.front.y,LIMB_L.front.w,LIMB_L.front.h);
+      crop(iw*0.54, ih*0.20, iw*0.38, ih*0.78, LIMB_R.front.x,LIMB_R.front.y,LIMB_R.front.w,LIMB_R.front.h);
+      ctx.fillStyle='rgba(0,0,0,0.08)';
+      ctx.fillRect(TORSO.back.x,TORSO.back.y,TORSO.back.w,TORSO.back.h);
     }
     if(shadows) edgeAO(ctx); // la photo a déjà son propre éclairage
   } else if(placement==='faces'){
