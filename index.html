@@ -41,8 +41,20 @@
   .btn.small{width:auto; padding:7px 12px; font-size:.8rem; margin:0;}
   .drop{border:2px dashed var(--border); border-radius:10px; padding:22px 12px; text-align:center; color:var(--muted); font-size:.85rem; cursor:pointer; margin-bottom:12px;}
   .drop.over{border-color:var(--accent); color:var(--accent);}
-  .drop canvas, .drop img{max-width:100%; max-height:110px; border-radius:6px; margin-top:8px;
+  .drop canvas, .drop img{max-width:100%; max-height:150px; border-radius:6px; margin-top:8px;
     background:repeating-conic-gradient(#2a2e37 0% 25%, #1c1f26 0% 50%) 0 0/12px 12px;}
+  .thumbs{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;}
+  .thumbs canvas{width:52px; height:52px; object-fit:contain; border:2px solid var(--border); border-radius:8px; cursor:pointer;
+    background:repeating-conic-gradient(#2a2e37 0% 25%, #1c1f26 0% 50%) 0 0/10px 10px;}
+  .thumbs canvas.sel{border-color:var(--accent);}
+  .layerRow{display:flex; align-items:center; gap:7px; padding:5px 7px; border:1px solid var(--border);
+    border-radius:8px; margin-bottom:5px; cursor:pointer; background:var(--panel2); font-size:.78rem;}
+  .layerRow.sel{border-color:var(--accent); background:#232c3f;}
+  .layerRow canvas{width:26px; height:26px; border-radius:4px;
+    background:repeating-conic-gradient(#2a2e37 0% 25%, #1c1f26 0% 50%) 0 0/8px 8px;}
+  .layerRow .lbl{flex:1; color:var(--text);}
+  .layerRow button{background:none; border:none; color:var(--muted); cursor:pointer; font-size:.85rem; padding:2px 4px;}
+  .layerRow button:hover{color:var(--text);}
   .previews{display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start;}
   .previewBox{background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px; text-align:center;}
   .previewBox .cap{font-size:.75rem; color:var(--muted); margin-top:8px;}
@@ -104,6 +116,15 @@
         </select>
       </div>
 
+      <div class="field" id="hemField">
+        <label>Ourlet / usure</label>
+        <select id="hemSel">
+          <option value="auto">Auto (selon le style)</option>
+          <option value="dechire">Déchiré / troué</option>
+          <option value="net">Net (jamais déchiré)</option>
+        </select>
+      </div>
+
       <div class="field">
         <label>Motif du tissu</label>
         <select id="patternSel">
@@ -150,17 +171,24 @@
     <!-- ----- MODE IMAGE ----- -->
     <div id="imageControls" style="display:none">
       <div class="drop" id="dropZone">
-        Dépose une image ici<br>ou clique pour choisir un fichier
-        <input type="file" id="fileInput" accept="image/*" style="display:none">
+        Dépose une ou plusieurs images ici<br>ou clique pour choisir des fichiers
+        <input type="file" id="fileInput" accept="image/*" multiple style="display:none">
       </div>
-      <div class="hint" style="margin:-4px 0 10px">💡 Astuce : utilise l'image du <b>logo/motif seul</b> plutôt qu'une photo de vêtement — le fond est supprimé et le motif recadré automatiquement.</div>
+      <div class="thumbs" id="imgLibEl"></div>
+      <div class="hint" style="margin:-4px 0 10px">💡 Charge <b>autant d'images que tu veux</b> : clique une vignette pour la sélectionner. Les réglages ci-dessous s'appliquent à l'image sélectionnée.</div>
 
       <label class="check"><input type="checkbox" id="removeBgChk" checked> Supprimer le fond automatiquement</label>
       <div class="field" id="tolField">
-        <label>Sensibilité du détourage : <span id="tolVal">32</span></label>
+        <label>Sensibilité (détourage &amp; baguette) : <span id="tolVal">32</span></label>
         <input type="range" id="tolRange" min="4" max="90" value="32">
       </div>
       <label class="check"><input type="checkbox" id="xeroxChk"> 🖨️ Effet photocopie (print noir &amp; blanc style catalogue)</label>
+
+      <label class="check"><input type="checkbox" id="wandChk"> 🪄 Baguette magique — clique sur l'aperçu de l'image pour <b>garder</b> une zone (clics multiples = plusieurs zones)</label>
+      <div class="row" id="wandRow" style="display:none; margin-bottom:10px">
+        <button class="btn small green" id="wandApply">✅ Appliquer</button>
+        <button class="btn small ghost" id="wandReset">↩️ Réinitialiser</button>
+      </div>
 
       <div class="field">
         <label>Placement</label>
@@ -175,10 +203,14 @@
       </div>
 
       <div id="freeOpts" style="display:none">
-        <button class="btn ghost" id="addStickerBtn" style="margin-bottom:10px">➕ Poser l'image sur le vêtement</button>
+        <button class="btn ghost" id="addStickerBtn" style="margin-bottom:10px">➕ Poser l'image sélectionnée en calque</button>
         <div class="field">
-          <label>Taille du sticker sélectionné</label>
-          <input type="range" id="stkSize" min="16" max="320" value="90">
+          <label>Calques (le premier est au-dessus)</label>
+          <div id="layersList"></div>
+        </div>
+        <div class="field">
+          <label>Taille du calque sélectionné</label>
+          <input type="range" id="stkSize" min="16" max="585" value="90">
           <label style="margin-top:8px">Rotation</label>
           <input type="range" id="stkRot" min="-180" max="180" value="0">
         </div>
@@ -186,14 +218,14 @@
           <button class="btn small ghost" id="stkDupBtn">📄 Dupliquer</button>
           <button class="btn small ghost" id="stkDelBtn">🗑️ Supprimer</button>
         </div>
-        <div class="hint" style="margin:0 0 10px">🎯 <b>Glisse les stickers directement sur l'aperçu.</b> Le design affiché sert de fond : génère d'abord un style en mode auto (ex. un hoodie emo), reviens ici, et pose ton image dessus. Tu peux en empiler plusieurs.</div>
+        <div class="hint" style="margin:0 0 10px">🎯 <b>Glisse les calques directement sur l'aperçu.</b> Le design affiché sert de fond : génère d'abord un style en mode auto, reviens ici, et empile tes images dessus.</div>
       </div>
 
       <div class="field" id="logoOpts">
         <label id="logoBaseLbl">Couleur du vêtement (sous le logo)</label>
         <div class="row"><input type="color" id="logoBase" value="#2e3440"></div>
         <label style="margin-top:10px" id="logoScaleLbl">Taille du logo</label>
-        <input type="range" id="logoScale" min="30" max="100" value="75">
+        <input type="range" id="logoScale" min="30" max="220" value="75">
       </div>
 
       <label class="check"><input type="checkbox" id="shadowChk" checked> Ombres réalistes (plis, volume, ombre du logo)</label>
@@ -657,6 +689,7 @@ function raggedEdge(ctx,rng,x0,x1,yBase,clearBelowTo){
   }
 }
 function tornHem(ctx,rng){
+  TORE=true;
   const zt=ZONES.torso, yBase=TORSO.front.y+TORSO.front.h;
   raggedEdge(ctx,rng, zt.x, zt.x+zt.w, yBase, zt.y+zt.h);
 }
@@ -756,6 +789,7 @@ function drawGhost(ctx,cx,cy,s,color,bg){
   }
 }
 function tornSleeves(ctx,rng){
+  TORE=true;
   const yBase=LIMB_L.front.y+LIMB_L.front.h;
   for(const z of [ZONES.limbL,ZONES.limbR])
     raggedEdge(ctx,rng, z.x, z.x+z.w, yBase, z.y+z.h);
@@ -1148,6 +1182,7 @@ function denimWash(ctx,rng,garmentKind){
 }
 /* Accroc réaliste : trou patatoïde + fils de trame tendus + bord effiloché */
 function ripHole(ctx,cx,cy,rw,rh,rng){
+  TORE=true;
   const path=new Path2D();
   for(let a=0;a<6.28;a+=0.35){
     const k=1+(rng()-0.5)*0.5;
@@ -1311,11 +1346,30 @@ const SHIRT_STYLES = {
       const fr=TORSO.front;
       // graphisme héro : 70-90 % du torse, légèrement décentré, encre érodée
       const hx=fr.x+fr.w/2+(rng()-0.5)*14, hy=fr.y+48+rng()*14;
-      if(rng()<0.5)
+      const hero=Math.floor(rng()*4);
+      if(hero===0)
         printWorn(ctx,TW,TH,o=>graffitiTag(o, hx, hy,
           pick(rng,['ENYGMA','OBLIVN','SORROW','H3X','VOID','N0CTA']), rng, p, 27), rng, 0.30);
-      else
+      else if(hero===1)
         printWorn(ctx,TW,TH,o=>scribbleArt(o, hx, hy+14, 55, rng, 'rgba(240,240,244,0.95)'), rng, 0.22);
+      else if(hero===2)
+        printWorn(ctx,TW,TH,o=>{ // cœur brisé XXL + halo pointillé
+          drawHeart(o, hx, hy+16, 40, 'rgba(240,240,244,0.95)', true, p.base);
+          o.strokeStyle='rgba(240,240,244,0.7)'; o.lineWidth=2.5; o.setLineDash([7,6]);
+          o.beginPath(); o.arc(hx, hy+14, 52, 0, 7); o.stroke(); o.setLineDash([]);
+        }, rng, 0.24);
+      else
+        printWorn(ctx,TW,TH,o=>{ // grand crâne griffonné
+          drawSkull(o, hx, hy+12, 42, 'rgba(240,240,244,0.92)', p.base);
+          scribbleArt(o, hx, hy+12, 46, rng, 'rgba(240,240,244,0.25)');
+        }, rng, 0.26);
+      // manches rayées façon mitaines (1 fois sur 3)
+      if(rng()<0.34){
+        clipRects(ctx, LIMBS.flatMap(l=>SIDE_FACES.map(f=>l[f])));
+        ctx.fillStyle='rgba(230,230,238,0.16)';
+        for(let y=355;y<556;y+=16) ctx.fillRect(0,y,TW,8);
+        ctx.restore();
+      }
       // sparkles éparpillés partout (torse + bras)
       const faces=[TORSO.front,TORSO.back,TORSO.left,TORSO.right,
         ...LIMBS.flatMap(l=>SIDE_FACES.map(f=>l[f]))];
@@ -1324,7 +1378,7 @@ const SHIRT_STYLES = {
       scatterInFaces(ctx,rng,[TORSO.back],3,(x,y,r2)=>drawSparkle(ctx,x,y,4+r2()*5,p.accent));
       for(const limb of LIMBS) for(const f of SIDE_FACES) band(ctx,limb[f],'rgba(255,255,255,0.10)',6,true);
     },
-    after(ctx,p,rng){ tornHem(ctx,rng); },
+    after(ctx,p,rng,opts){ if(tornAllowed(opts)) tornHem(ctx,rng); },
     noise:1500, noiseAlpha:0.045},
   y2k: {label:'✨ Y2K', fabric:'solid',
     palette(rng,forced){
@@ -1341,14 +1395,35 @@ const SHIRT_STYLES = {
     paint(ctx,p,rng){
       const v=this._v??0;
       const fr=TORSO.front, bk=TORSO.back;
-      if(v===0){ // hoodie ouvert, prints gothiques ailés érodés
-        openJacket(ctx,rng,'#1c1c22',true);
+      if(v===0){ // hoodie/veste ouvert(e), print gothique — motif et détails variables
+        const inner=pick(rng,['#1c1c22','#3a2430','#22303a','#101014']);
+        openJacket(ctx,rng,inner,rng()<0.7);
+        const motif=Math.floor(rng()*3);
+        const ink='rgba(22,22,26,0.9)';
         printWorn(ctx,TW,TH,o=>{
-          wingsCross(o, fr.x+fr.w*0.24, fr.y+54, 36, 'rgba(22,22,26,0.9)');
-          wingsCross(o, fr.x+fr.w*0.76, fr.y+54, 36, 'rgba(22,22,26,0.9)');
-          wingsCross(o, bk.x+bk.w/2, bk.y+60, 54, 'rgba(22,22,26,0.9)');
-        }, rng, 0.28, 'multiply');
-        scatterInFaces(ctx,rng,LIMBS.flatMap(l=>SIDE_FACES.map(f=>l[f])),6,
+          if(motif===0){ // croix ailées jumelles
+            wingsCross(o, fr.x+fr.w*0.24, fr.y+50+rng()*10, 34+rng()*6, ink);
+            wingsCross(o, fr.x+fr.w*0.76, fr.y+50+rng()*10, 34+rng()*6, ink);
+            wingsCross(o, bk.x+bk.w/2, bk.y+60, 54, ink);
+          } else if(motif===1){ // cœur gothique ailé unique
+            drawHeart(o, fr.x+fr.w*0.28, fr.y+56, 22, ink, rng()<0.5, '#c8c8d0');
+            o.strokeStyle=ink; o.lineCap='round';
+            for(const m of [-1,1]) for(let i=0;i<4;i++){
+              o.lineWidth=2.2-i*0.3;
+              o.beginPath();
+              o.moveTo(fr.x+fr.w*0.28+m*14, fr.y+52-i*3);
+              o.quadraticCurveTo(fr.x+fr.w*0.28+m*34, fr.y+34-i*2, fr.x+fr.w*0.28+m*48, fr.y+50-i*5);
+              o.stroke();
+            }
+            drawHeart(o, bk.x+bk.w/2, bk.y+58, 30, ink, true, '#c8c8d0');
+          } else { // pluie de petites croix
+            for(let i=0;i<9;i++)
+              wingsCross(o, fr.x+12+rng()*(fr.w-24), fr.y+16+rng()*(fr.h-32), 10+rng()*14, ink);
+            for(let i=0;i<6;i++)
+              wingsCross(o, bk.x+12+rng()*(bk.w-24), bk.y+16+rng()*(bk.h-32), 10+rng()*14, ink);
+          }
+        }, rng, 0.24+rng()*0.1, 'multiply');
+        if(rng()<0.7) scatterInFaces(ctx,rng,LIMBS.flatMap(l=>SIDE_FACES.map(f=>l[f])),4+Math.floor(rng()*5),
           (x,y,r2)=>wingsCross(ctx,x,y,9+r2()*6,'rgba(22,22,26,0.5)'));
         const cx=fr.x+fr.w/2; // cordons
         ctx.strokeStyle='rgba(0,0,0,0.4)'; ctx.lineWidth=3; ctx.lineCap='round';
@@ -1356,41 +1431,63 @@ const SHIRT_STYLES = {
         ctx.beginPath(); ctx.moveTo(cx+16,fr.y+8); ctx.lineTo(cx+19,fr.y+34); ctx.stroke();
         for(const limb of LIMBS) for(const f of SIDE_FACES) ribbed(ctx,limb[f],'#d9d6cf',9,true);
         for(const f of SIDE_FACES) ribbed(ctx,TORSO[f],'#d9d6cf',8,true);
-      } else if(v===1){ // veste en jean ouverte sur tee blanc + script
+      } else if(v===1){ // veste en jean ouverte — tee, col, écusson variables
         denimCreases(ctx,rng);
-        openJacket(ctx,rng,'#f4f2ee',true);
-        // poches poitrine
-        ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1.5;
-        ctx.strokeRect(fr.x+14,fr.y+44,26,22); ctx.strokeRect(fr.x+fr.w-40,fr.y+44,26,22);
-        ctx.fillStyle='rgba(0,0,0,0.2)';
-        ctx.fillRect(fr.x+14,fr.y+44,26,6); ctx.fillRect(fr.x+fr.w-40,fr.y+44,26,6);
-        // lettrage script blanc à travers la poitrine
-        const word=pick(rng,['Angel','Star','Dream','Retro','Astro']);
-        ctx.font='900 italic 26px Georgia,serif';
-        ctx.textAlign='center'; ctx.textBaseline='middle';
-        ctx.lineWidth=4; ctx.strokeStyle='rgba(20,25,40,0.85)';
-        ctx.strokeText(word, fr.x+fr.w/2, fr.y+34);
-        ctx.fillStyle='#ffffff'; ctx.fillText(word, fr.x+fr.w/2, fr.y+34);
-        ctx.strokeText(word, bk.x+bk.w/2, bk.y+44);
-        ctx.fillText(word, bk.x+bk.w/2, bk.y+44);
-        // ceinture + boutons de veste
+        const teeCol=pick(rng,['#f4f2ee','#e8dbe4','#141418']);
+        openJacket(ctx,rng,teeCol,true);
+        if(rng()<0.4){ // col sherpa
+          ctx.fillStyle='#e8e2d4';
+          for(const f of ['front','back']) band(ctx,TORSO[f],'#e8e2d4',9,false,0.95);
+        }
+        if(rng()<0.75){ // poches poitrine
+          ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1.5;
+          ctx.strokeRect(fr.x+14,fr.y+44,26,22); ctx.strokeRect(fr.x+fr.w-40,fr.y+44,26,22);
+          ctx.fillStyle='rgba(0,0,0,0.2)';
+          ctx.fillRect(fr.x+14,fr.y+44,26,6); ctx.fillRect(fr.x+fr.w-40,fr.y+44,26,6);
+        }
+        if(rng()<0.6){ // lettrage script à travers la poitrine
+          const word=pick(rng,['Angel','Star','Dream','Retro','Astro','Halo','Vega']);
+          ctx.font=`900 italic ${23+Math.floor(rng()*8)}px Georgia,serif`;
+          ctx.textAlign='center'; ctx.textBaseline='middle';
+          ctx.lineWidth=4; ctx.strokeStyle='rgba(20,25,40,0.85)';
+          const wy=fr.y+30+rng()*14;
+          ctx.strokeText(word, fr.x+fr.w/2, wy);
+          ctx.fillStyle='#ffffff'; ctx.fillText(word, fr.x+fr.w/2, wy);
+          ctx.strokeText(word, bk.x+bk.w/2, bk.y+44);
+          ctx.fillText(word, bk.x+bk.w/2, bk.y+44);
+        } else { // écusson papillon / étoile sur la poitrine
+          if(rng()<0.5) drawButterfly(ctx, fr.x+fr.w*0.3, fr.y+52, 18, '#ffffff', 'rgba(20,25,40,0.9)');
+          else drawStar(ctx, fr.x+fr.w*0.3, fr.y+52, 13, '#ffffff');
+          drawStar(ctx, bk.x+bk.w/2, bk.y+52, 22, 'rgba(255,255,255,0.9)');
+        }
+        // ceinture + boutons (métal variable)
         for(const f of SIDE_FACES) band(ctx,TORSO[f],p.dark,9,true);
-        ctx.fillStyle='#c9a24a';
+        ctx.fillStyle=pick(rng,['#c9a24a','#c9c9cf','#8a6a3a']);
         ctx.beginPath(); ctx.arc(fr.x+18,fr.y+fr.h-4.5,2.5,0,7); ctx.arc(fr.x+fr.w-18,fr.y+fr.h-4.5,2.5,0,7); ctx.fill();
         for(const limb of LIMBS) for(const f of SIDE_FACES) band(ctx,limb[f],p.dark,8,true,0.8);
-      } else { // étoiles noires façon imprimé
+      } else { // imprimé étoiles — densité et mélange variables
         const faces=[TORSO.front,TORSO.back,TORSO.left,TORSO.right,
           ...LIMBS.flatMap(l=>SIDE_FACES.map(f=>l[f]))];
-        scatterInFaces(ctx,rng,faces,26,(x,y,r2)=>{
+        const density=16+Math.floor(rng()*22);
+        const withMoons=rng()<0.4, withHearts=rng()<0.3;
+        scatterInFaces(ctx,rng,faces,density,(x,y,r2)=>{
           ctx.save(); ctx.translate(x,y); ctx.rotate(r2()*6.28);
-          drawStar(ctx,0,0,4+r2()*8,p.accent);
+          if(withHearts && r2()<0.3) drawHeart(ctx,0,0,4+r2()*5,p.accent,false);
+          else if(withMoons && r2()<0.3){
+            ctx.fillStyle=p.accent;
+            ctx.beginPath();
+            ctx.arc(0,0,5+r2()*5,Math.PI*0.3,Math.PI*1.7);
+            ctx.arc(3.5+r2()*2,0,(5+r2()*5)*0.75,Math.PI*1.55,Math.PI*0.45,true);
+            ctx.closePath(); ctx.fill();
+          }
+          else drawStar(ctx,0,0,4+r2()*8,p.accent);
           ctx.restore();
         });
-        scatterInFaces(ctx,rng,faces,8,(x,y,r2)=>drawSparkle(ctx,x,y,3+r2()*4,p.accent));
-        for(const f of SIDE_FACES) band(ctx,TORSO[f],p.accent,6,false,0.75);
+        scatterInFaces(ctx,rng,faces,4+Math.floor(rng()*8),(x,y,r2)=>drawSparkle(ctx,x,y,3+r2()*4,p.accent));
+        if(rng()<0.7) for(const f of SIDE_FACES) band(ctx,TORSO[f],p.accent,6,false,0.75);
       }
     },
-    after(ctx,p,rng){ if((this._v??0)===2) tornHem(ctx,rng); },
+    after(ctx,p,rng,opts){ if((this._v??0)===2 && tornAllowed(opts) && rng()<0.6) tornHem(ctx,rng); },
     noise:1400, noiseAlpha:0.04},
   kawaii: {label:'🌸 Kawaii', fabric:'solid',
     palette:paletteFrom([['#f6c2d7','#a34462'],['#f9d0e0','#94405c'],['#fbdae6','#b04a68']]),
@@ -1484,7 +1581,7 @@ const SHIRT_STYLES = {
     },
     after(ctx,p,rng,opts){
       if(opts && opts.fit==='femme'){
-        tornHem(ctx,rng);
+        if(tornAllowed(opts)) tornHem(ctx,rng);
         // une épaule nue : le bras droit du template reste en peau
         ctx.clearRect(ZONES.limbR.x,ZONES.limbR.y,ZONES.limbR.w,ZONES.limbR.h);
       }
@@ -1526,8 +1623,8 @@ const SHIRT_STYLES = {
           ctx.fillText(pick(rng,['1899','NEWS','no.7','EST.']), fr.x+4+rng()*70, fr.y+14+rng()*104);
       }
     },
-    after(ctx,p,rng){
-      if((this._v??0)!==0){ tornHem(ctx,rng); tornSleeves(ctx,rng); }
+    after(ctx,p,rng,opts){
+      if((this._v??0)!==0 && tornAllowed(opts) && rng()<0.7){ tornHem(ctx,rng); tornSleeves(ctx,rng); }
     },
     noise:1600, noiseAlpha:0.045},
 };
@@ -1676,7 +1773,8 @@ const PANTS_STYLES = {
       PANTS_STYLES.jean.paint(ctx,p,rng);
       this._ripY=[380+rng()*30, 420+rng()*30]; // mémorise pour after()
     },
-    after(ctx,p,rng){
+    after(ctx,p,rng,opts){
+      if(!tornAllowed(opts)) return;
       // accrocs patatoïdes : la peau apparaît entre les fils tendus
       for(const limb of LIMBS){
         const r=limb.front;
@@ -1881,11 +1979,13 @@ function pickStyle(set, key, rng){
 }
 
 let SKIP_FIT=false; // un style peut annuler la coupe générique (ex : corset)
+let TORE=false;     // une déchirure a-t-elle déjà été appliquée ?
+function tornAllowed(opts){ return !(opts && opts.hem==='net'); }
 function generateTemplate(kind, opts){
   const cv=document.createElement('canvas'); cv.width=TW; cv.height=TH;
   const ctx=cv.getContext('2d');
   const rng=mulberry32(opts.seed);
-  SKIP_FIT=false;
+  SKIP_FIT=false; TORE=false;
   const [styleKey, style]=pickStyle(STYLE_SETS[kind], opts.style, rng);
   const p = opts.palette || (style.palette ? style.palette(rng,opts.forcedColor) : makePalette(rng,opts.forcedColor));
   const patKey = opts.pattern!=='auto' ? opts.pattern : (style.fabric||'solid');
@@ -1907,6 +2007,15 @@ function generateTemplate(kind, opts){
   hardenAlpha(ctx,TW,TH);
   // découpes (déchirures, coupes) : après le soften pour garder des bords nets
   if(style.after) style.after(ctx,p,rng,opts);
+  // « Déchiré » demandé mais le style n'a rien déchiré : on s'en charge
+  if(opts.hem==='dechire' && !TORE){
+    if(kind==='shirt'){ tornHem(ctx,rng); }
+    else for(const limb of LIMBS){
+      const r=limb.front;
+      ripHole(ctx, r.x+r.w/2+(rng()-0.5)*10, r.y+30+rng()*70, 14+rng()*7, 5+rng()*3, rng);
+    }
+    TORE=true;
+  }
   if(!style.skipFit && !SKIP_FIT) applyFit(kind, opts.fit||'mixte', ctx, p);
   return {canvas:cv, styleKey, palette:p};
 }
@@ -2225,7 +2334,9 @@ function makeZip(files){
 /* ========================= UI ========================= */
 const $=id=>document.getElementById(id);
 let curType='tshirt', curMode='auto';
-let rawImg=null, processedImg=null;
+const IMG_LIB=[];   // bibliothèque d'images {raw, name, processed, wandMask}
+let selLib=-1;
+function curImg(){ return selLib>=0 && IMG_LIB[selLib] ? IMG_LIB[selLib].processed : null; }
 let current=null;
 const gallery=[];
 
@@ -2249,6 +2360,7 @@ function refreshTypeUI(){
   $('typeHint').innerHTML=TYPE_HINTS[curType];
   $('chestTextField').style.display = curType==='tshirt' ? '' : 'none';
   $('fitField').style.display = curType==='tshirt' ? 'none' : '';
+  $('hemField').style.display = curType==='tshirt' ? 'none' : '';
   $('setBtn').style.display = curType==='tshirt' ? 'none' : '';
   $('collBtn').style.display = curType==='tshirt' ? 'none' : '';
   $('mainCap').textContent = curType==='tshirt' ? 'Image T-Shirt 512×512' : 'Template 585×559';
@@ -2263,7 +2375,7 @@ $('typeTabs').addEventListener('click',e=>{
   curType=e.target.dataset.type;
   setTabs($('typeTabs'),'type',curType);
   refreshTypeUI();
-  if(freeMode){ stickers=[]; selStk=-1; enterFree(); } // la taille du canvas change
+  if(freeMode){ stickers=[]; selStk=-1; enterFree(); refreshLayers(); } // la taille du canvas change
 });
 $('modeTabs').addEventListener('click',e=>{
   if(!e.target.dataset.mode) return;
@@ -2354,12 +2466,43 @@ function renderFree(){
   drawAvatar($('avatarCanvas'), curType, bakeFree(false));
   $('seedBadge').textContent=`${stickers.length} sticker${stickers.length>1?'s':''}`;
 }
+function refreshLayers(){
+  const el=$('layersList');
+  el.innerHTML='';
+  for(let i=stickers.length-1;i>=0;i--){
+    const s=stickers[i];
+    const row=document.createElement('div');
+    row.className='layerRow'+(i===selStk?' sel':'');
+    const th=document.createElement('canvas'); th.width=26; th.height=26;
+    const c=th.getContext('2d');
+    const sc=Math.min(26/s.img.width,26/s.img.height);
+    c.drawImage(s.img,(26-s.img.width*sc)/2,(26-s.img.height*sc)/2,s.img.width*sc,s.img.height*sc);
+    const lbl=document.createElement('span'); lbl.className='lbl'; lbl.textContent=`Calque ${i+1}`;
+    const up=document.createElement('button'); up.textContent='⬆'; up.title='Monter';
+    up.addEventListener('click',e=>{e.stopPropagation();
+      if(i<stickers.length-1){ [stickers[i],stickers[i+1]]=[stickers[i+1],stickers[i]]; selStk=i+1; renderFree(); refreshLayers(); }});
+    const dn=document.createElement('button'); dn.textContent='⬇'; dn.title='Descendre';
+    dn.addEventListener('click',e=>{e.stopPropagation();
+      if(i>0){ [stickers[i],stickers[i-1]]=[stickers[i-1],stickers[i]]; selStk=i-1; renderFree(); refreshLayers(); }});
+    const del=document.createElement('button'); del.textContent='🗑️';
+    del.addEventListener('click',e=>{e.stopPropagation();
+      stickers.splice(i,1); selStk=Math.min(selStk,stickers.length-1); renderFree(); refreshLayers();});
+    row.append(th,lbl,up,dn,del);
+    row.addEventListener('click',()=>{
+      selStk=i;
+      $('stkSize').value=s.w; $('stkRot').value=s.rot;
+      renderFree(); refreshLayers();
+    });
+    el.appendChild(row);
+  }
+}
 $('addStickerBtn').addEventListener('click',()=>{
-  if(!processedImg){ dz.style.borderColor='var(--danger)'; setTimeout(()=>dz.style.borderColor='',900); return; }
+  const img=curImg();
+  if(!img){ dz.style.borderColor='var(--danger)'; setTimeout(()=>dz.style.borderColor='',900); return; }
   const isT=curType==='tshirt';
   const fr=TORSO.front;
   stickers.push({
-    img:processedImg,
+    img,
     x: isT?256:fr.x+fr.w/2 + stickers.length*8,
     y: isT?256:fr.y+fr.h/2 + stickers.length*8,
     w: parseInt($('stkSize').value,10),
@@ -2367,6 +2510,7 @@ $('addStickerBtn').addEventListener('click',()=>{
   });
   selStk=stickers.length-1;
   renderFree();
+  refreshLayers();
 });
 $('stkSize').addEventListener('input',()=>{
   if(freeMode && selStk>=0 && stickers[selStk]){ stickers[selStk].w=parseInt($('stkSize').value,10); renderFree(); }
@@ -2375,7 +2519,7 @@ $('stkRot').addEventListener('input',()=>{
   if(freeMode && selStk>=0 && stickers[selStk]){ stickers[selStk].rot=parseInt($('stkRot').value,10); renderFree(); }
 });
 $('stkDelBtn').addEventListener('click',()=>{
-  if(selStk>=0){ stickers.splice(selStk,1); selStk=stickers.length-1; renderFree(); }
+  if(selStk>=0){ stickers.splice(selStk,1); selStk=stickers.length-1; renderFree(); refreshLayers(); }
 });
 $('stkDupBtn').addEventListener('click',()=>{
   if(selStk>=0 && stickers[selStk]){
@@ -2383,6 +2527,7 @@ $('stkDupBtn').addEventListener('click',()=>{
     stickers.push({...s, x:s.x+16, y:s.y+16});
     selStk=stickers.length-1;
     renderFree();
+    refreshLayers();
   }
 });
 
@@ -2413,6 +2558,7 @@ $('mainCanvas').addEventListener('pointerdown',e=>{
     $('mainCanvas').setPointerCapture(e.pointerId);
   }
   renderFree();
+  refreshLayers();
 });
 $('mainCanvas').addEventListener('pointermove',e=>{
   if(!freeMode||!dragging||selStk<0) return;
@@ -2422,37 +2568,145 @@ $('mainCanvas').addEventListener('pointermove',e=>{
 });
 $('mainCanvas').addEventListener('pointerup',()=>{ dragging=false; });
 
-/* ----- zone image + détourage ----- */
+/* ----- bibliothèque d'images + détourage + baguette magique ----- */
 const dz=$('dropZone');
-dz.addEventListener('click',()=>$('fileInput').click());
-$('fileInput').addEventListener('change',e=>loadFile(e.target.files[0]));
+dz.addEventListener('click',e=>{ if(e.target.tagName!=='CANVAS') $('fileInput').click(); });
+$('fileInput').addEventListener('change',e=>loadFiles(e.target.files));
 dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');});
 dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
-dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');loadFile(e.dataTransfer.files[0]);});
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');loadFiles(e.dataTransfer.files);});
 
-function reprocessImage(){
-  if(!rawImg) return;
-  processedImg = preprocessImage(rawImg, $('removeBgChk').checked, parseInt($('tolRange').value,10));
-  if($('xeroxChk').checked) processedImg = xeroxify(processedImg, mulberry32(Math.floor(Math.random()*1e9)));
-  dz.innerHTML = $('removeBgChk').checked ? 'Image détourée ✂️ (aperçu)<br>' : 'Image chargée ✔<br>';
+function processEntry(entry){
+  entry.processed = preprocessImage(entry.raw, $('removeBgChk').checked, parseInt($('tolRange').value,10));
+  if($('xeroxChk').checked) entry.processed = xeroxify(entry.processed, mulberry32(Math.floor(Math.random()*1e9)));
+  entry.wandMask=null;
+}
+function loadFiles(files){
+  for(const f of files){
+    if(!f||!f.type.startsWith('image/')) continue;
+    const img=new Image();
+    const name=f.name;
+    img.onload=()=>{
+      const entry={raw:img, name};
+      processEntry(entry);
+      IMG_LIB.push(entry);
+      selLib=IMG_LIB.length-1;
+      refreshLib();
+      renderDropPreview();
+    };
+    img.src=URL.createObjectURL(f);
+  }
+}
+function refreshLib(){
+  const el=$('imgLibEl');
+  el.innerHTML='';
+  IMG_LIB.forEach((entry,i)=>{
+    const th=document.createElement('canvas');
+    th.width=52; th.height=52;
+    const c=th.getContext('2d');
+    const sc=Math.min(52/entry.processed.width, 52/entry.processed.height);
+    c.drawImage(entry.processed, (52-entry.processed.width*sc)/2, (52-entry.processed.height*sc)/2,
+      entry.processed.width*sc, entry.processed.height*sc);
+    if(i===selLib) th.classList.add('sel');
+    th.title=entry.name;
+    th.addEventListener('click',()=>{ selLib=i; refreshLib(); renderDropPreview(); });
+    el.appendChild(th);
+  });
+}
+function renderDropPreview(){
+  const entry=IMG_LIB[selLib];
+  if(!entry){ dz.innerHTML='Dépose une ou plusieurs images ici<br>ou clique pour choisir des fichiers'; return; }
+  dz.innerHTML=($('wandChk').checked?'🪄 Clique sur les zones à garder<br>':'Image sélectionnée ✔<br>');
+  const p=entry.processed;
   const th=document.createElement('canvas');
-  const sc=Math.min(1, 220/Math.max(processedImg.width,processedImg.height));
-  th.width=Math.max(1,processedImg.width*sc); th.height=Math.max(1,processedImg.height*sc);
-  th.getContext('2d').drawImage(processedImg,0,0,th.width,th.height);
+  const sc=Math.min(1, 300/Math.max(p.width,p.height));
+  th.width=Math.max(1,Math.round(p.width*sc)); th.height=Math.max(1,Math.round(p.height*sc));
+  const c=th.getContext('2d');
+  c.drawImage(p,0,0,th.width,th.height);
+  if(entry.wandMask){ // zones non retenues assombries
+    const id=c.getImageData(0,0,th.width,th.height), d=id.data;
+    for(let y=0;y<th.height;y++) for(let x=0;x<th.width;x++){
+      const sx=Math.min(p.width-1,(x/sc)|0), sy=Math.min(p.height-1,(y/sc)|0);
+      if(!entry.wandMask[sy*p.width+sx]){
+        const i=(y*th.width+x)*4;
+        d[i]*=0.25; d[i+1]*=0.25; d[i+2]*=0.35;
+      }
+    }
+    c.putImageData(id,0,0);
+  }
+  th.addEventListener('click',ev=>{
+    if(!$('wandChk').checked) return;
+    ev.stopPropagation();
+    const r=th.getBoundingClientRect();
+    const px=Math.min(p.width-1, Math.max(0, Math.round((ev.clientX-r.left)*p.width/r.width)));
+    const py=Math.min(p.height-1, Math.max(0, Math.round((ev.clientY-r.top)*p.height/r.height)));
+    wandPick(entry, px, py, parseInt($('tolRange').value,10));
+    renderDropPreview();
+  });
   dz.appendChild(th);
 }
-function loadFile(f){
-  if(!f||!f.type.startsWith('image/')) return;
-  const img=new Image();
-  img.onload=()=>{ rawImg=img; reprocessImage(); };
-  img.src=URL.createObjectURL(f);
+/* Baguette : garde la zone contiguë de couleur similaire au pixel cliqué */
+function wandPick(entry, sx, sy, tolerance){
+  const p=entry.processed, W=p.width, H=p.height;
+  const d=p.getContext('2d').getImageData(0,0,W,H).data;
+  const si=(sy*W+sx)*4;
+  if(d[si+3]<12) return; // clic dans le vide
+  const r0=d[si], g0=d[si+1], b0=d[si+2];
+  const T2=Math.pow(tolerance*4.4,2);
+  if(!entry.wandMask) entry.wandMask=new Uint8Array(W*H);
+  const visited=new Uint8Array(W*H);
+  const stack=[sy*W+sx];
+  while(stack.length){
+    const i=stack.pop();
+    if(visited[i]) continue;
+    visited[i]=1;
+    const j=i*4;
+    if(d[j+3]<12) continue;
+    const dr=d[j]-r0, dg=d[j+1]-g0, db=d[j+2]-b0;
+    if(dr*dr+dg*dg+db*db > T2) continue;
+    entry.wandMask[i]=1;
+    const x=i%W, y=(i/W)|0;
+    if(x>0) stack.push(i-1);
+    if(x<W-1) stack.push(i+1);
+    if(y>0) stack.push(i-W);
+    if(y<H-1) stack.push(i+W);
+  }
+}
+$('wandChk').addEventListener('change',()=>{
+  $('wandRow').style.display=$('wandChk').checked?'':'none';
+  renderDropPreview();
+});
+$('wandApply').addEventListener('click',()=>{
+  const entry=IMG_LIB[selLib];
+  if(!entry||!entry.wandMask) return;
+  const p=entry.processed, W=p.width, H=p.height;
+  const ctx=p.getContext('2d');
+  const id=ctx.getImageData(0,0,W,H), d=id.data;
+  for(let i=0;i<W*H;i++) if(!entry.wandMask[i]) d[i*4+3]=0;
+  ctx.putImageData(id,0,0);
+  entry.processed=cropToContent(p);
+  entry.wandMask=null;
+  refreshLib(); renderDropPreview();
+});
+$('wandReset').addEventListener('click',()=>{
+  const entry=IMG_LIB[selLib];
+  if(!entry) return;
+  processEntry(entry);
+  refreshLib(); renderDropPreview();
+});
+
+function reprocessImage(){
+  const entry=IMG_LIB[selLib];
+  if(!entry) return;
+  processEntry(entry);
+  refreshLib(); renderDropPreview();
 }
 $('removeBgChk').addEventListener('change',()=>{
   $('tolField').style.display=$('removeBgChk').checked?'':'none';
   reprocessImage();
 });
 $('tolRange').addEventListener('input',()=>{ $('tolVal').textContent=$('tolRange').value; });
-$('tolRange').addEventListener('change',reprocessImage);
+$('tolRange').addEventListener('change',()=>{ if(!$('wandChk').checked) reprocessImage(); });
 $('xeroxChk').addEventListener('change',reprocessImage);
 
 /* ----- rendu de l'aperçu principal ----- */
@@ -2573,18 +2827,18 @@ function makeAutoItem(kind, opts){
     canvas:g.canvas, kind, seed:opts.seed,
     name:`${kind}-${g.styleKey}-${opts.seed}.png`,
     title:itemTitle(kind,g.styleKey,opts.seed),
-    rec:{t:'auto', kind, style:g.styleKey, pattern:opts.pattern, fit:opts.fit,
+    rec:{t:'auto', kind, style:g.styleKey, pattern:opts.pattern, fit:opts.fit, hem:opts.hem||'auto',
          text:opts.text||'', forcedColor:opts.forcedColor||null, seed:opts.seed},
   };
 }
-function makeSetItems(shirtStyle, pattern, fit, forcedColor, seed){
-  const gs=generateTemplate('shirt',{style:shirtStyle, pattern, fit, seed, forcedColor, text:''});
+function makeSetItems(shirtStyle, pattern, fit, forcedColor, seed, hem){
+  const gs=generateTemplate('shirt',{style:shirtStyle, pattern, fit, hem, seed, forcedColor, text:''});
   const pStyle=MATCH_PANTS[gs.styleKey]||'jean';
-  const gp=generateTemplate('pants',{style:pStyle, pattern:'auto', fit, seed:seed+7, palette:gs.palette});
+  const gp=generateTemplate('pants',{style:pStyle, pattern:'auto', fit, hem, seed:seed+7, palette:gs.palette});
   const shirtItem={canvas:gs.canvas, kind:'shirt', seed,
     name:`shirt-${gs.styleKey}-ensemble-${seed}.png`,
     title:itemTitle('shirt',gs.styleKey,seed),
-    rec:{t:'set', style:gs.styleKey, pattern, fit, forcedColor:forcedColor||null, seed}};
+    rec:{t:'set', style:gs.styleKey, pattern, fit, hem:hem||'auto', forcedColor:forcedColor||null, seed}};
   const pantsItem={canvas:gp.canvas, kind:'pants', seed:seed+7,
     name:`pants-${gp.styleKey}-ensemble-${seed}.png`,
     title:itemTitle('pants',gp.styleKey,seed),
@@ -2592,8 +2846,8 @@ function makeSetItems(shirtStyle, pattern, fit, forcedColor, seed){
   shirtItem.pair=pantsItem; pantsItem.pair=shirtItem;
   return [shirtItem, pantsItem];
 }
-function addSet(shirtStyle, pattern, fit, forcedColor, seed, skipSave, fav){
-  const [s,p]=makeSetItems(shirtStyle,pattern,fit,forcedColor,seed);
+function addSet(shirtStyle, pattern, fit, forcedColor, seed, skipSave, fav, hem){
+  const [s,p]=makeSetItems(shirtStyle,pattern,fit,forcedColor,seed,hem);
   if(fav) s.rec.fav=true;
   addToGallery(p,true);
   addToGallery(s,skipSave);
@@ -2608,6 +2862,7 @@ $('genBtn').addEventListener('click',()=>{
     style:$('styleSel').value,
     pattern:$('patternSel').value,
     fit:$('fitSel').value,
+    hem:$('hemSel').value,
     text: curType==='tshirt' ? $('chestText').value.trim().toUpperCase() : '',
     forcedColor:forced,
   };
@@ -2622,7 +2877,8 @@ $('genBtn').addEventListener('click',()=>{
 $('setBtn').addEventListener('click',()=>{
   const forced = $('randColor').checked ? null : $('baseColor').value;
   const shirtStyle = curType==='shirt' ? $('styleSel').value : 'random';
-  current=addSet(shirtStyle, $('patternSel').value, $('fitSel').value, forced, Math.floor(Math.random()*1e9));
+  current=addSet(shirtStyle, $('patternSel').value, $('fitSel').value, forced,
+    Math.floor(Math.random()*1e9), false, false, $('hemSel').value);
   renderMain();
 });
 
@@ -2632,7 +2888,8 @@ $('collBtn').addEventListener('click',()=>{
   const shirtStyle = curType==='shirt' ? $('styleSel').value : 'random';
   let first=null;
   for(let i=0;i<6;i++){
-    const s=addSet(shirtStyle, $('patternSel').value, $('fitSel').value, forced, Math.floor(Math.random()*1e9));
+    const s=addSet(shirtStyle, $('patternSel').value, $('fitSel').value, forced,
+      Math.floor(Math.random()*1e9), false, false, $('hemSel').value);
     if(!first) first=s;
   }
   current=first; renderMain();
@@ -2652,8 +2909,9 @@ $('genImgBtn').addEventListener('click',()=>{
     renderFree();
     return;
   }
-  if(!processedImg){ dz.style.borderColor='var(--danger)'; setTimeout(()=>dz.style.borderColor='',900); return; }
-  const g=generateFromImage(curType, processedImg, $('placementSel').value, $('logoBase').value, parseInt($('logoScale').value,10), $('shadowChk').checked);
+  const img=curImg();
+  if(!img){ dz.style.borderColor='var(--danger)'; setTimeout(()=>dz.style.borderColor='',900); return; }
+  const g=generateFromImage(curType, img, $('placementSel').value, $('logoBase').value, parseInt($('logoScale').value,10), $('shadowChk').checked);
   const item={canvas:g.canvas, kind:curType, seed:null,
     name:`${curType}-image-${Date.now()%1e6}.png`};
   addToGallery(item);
@@ -2689,11 +2947,11 @@ function loadGallery(){
     try{
       if(r.t==='auto'){
         const it=makeAutoItem(r.kind,{style:r.style, pattern:r.pattern||'auto', fit:r.fit||'mixte',
-          text:r.text||'', forcedColor:r.forcedColor||null, seed:r.seed});
+          hem:r.hem||'auto', text:r.text||'', forcedColor:r.forcedColor||null, seed:r.seed});
         it.rec.fav=r.fav;
         addToGallery(it,true);
       } else if(r.t==='set'){
-        addSet(r.style, r.pattern||'auto', r.fit||'mixte', r.forcedColor||null, r.seed, true, r.fav);
+        addSet(r.style, r.pattern||'auto', r.fit||'mixte', r.forcedColor||null, r.seed, true, r.fav, r.hem||'auto');
       }
     }catch(e){/* record corrompu : on l'ignore */}
   }

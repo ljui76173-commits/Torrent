@@ -40,13 +40,17 @@ Des **vrais styles de vêtements**, dont les tendances :
   🎸 **Grunge** (jean troué — la peau apparaît dans les déchirures), 🌸 **Kawaii**
 - **T-Shirts** : badge, marinière, dégradé, sport, tie-dye, camo + Emo / Y2K / Kawaii / Grunge
 - **Coupe au choix** : mixte, féminine (crop top + manches courtes) ou masculine
+- **Ourlet au choix** : auto, déchiré/troué forcé, ou net (jamais déchiré)
 - Palettes thématiques par tendance + 18 palettes générales soignées, ou couleur au choix
 - Texte personnalisé sur la poitrine (T-Shirt), génération en lot (jusqu'à 24)
 - **Shadows réalistes** : ombrage des faces, bords assombris, plis de tissu, grain textile
 
 ### Mode « Depuis une image »
-Dépose n'importe quelle image (logo, dessin, même une photo) :
+Charge **autant d'images que tu veux** (bibliothèque à vignettes) :
 - ✂️ **Suppression automatique du fond** (sensibilité réglable) + recadrage sur le motif
+- 🪄 **Baguette magique** : clique les zones de l'image à garder, le reste est supprimé
+- 🖨️ **Effet photocopie** pour transformer n'importe quelle image en print catalogue
+- 🗂️ **Calques** en placement libre : empile plusieurs images, réordonne, duplique, supprime
 - Placements : **logo poitrine** (ombre portée), **logo devant + dos**,
   🎯 **placement libre** — glisse tes images directement sur l'aperçu (déplacement à la
   souris, taille, rotation, duplication, plusieurs stickers superposables, et le fond peut
