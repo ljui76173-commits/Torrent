@@ -138,6 +138,7 @@
       </div>
 
       <button class="btn" id="genBtn">✨ Générer</button>
+      <button class="btn ghost" id="setBtn" style="margin-top:8px">🧥+👖 Générer un ensemble assorti</button>
     </div>
 
     <!-- ----- MODE IMAGE ----- -->
@@ -1103,6 +1104,68 @@ function printWorn(ctx,W,H,drawFn,rng,wear,mode){
   ctx.drawImage(off,0,0);
   ctx.restore();
 }
+/* Délavage denim : marbrures acid-wash + usure genoux/cuisses (soft-light) */
+function denimWash(ctx,rng,garmentKind){
+  const off=document.createElement('canvas'); off.width=TW; off.height=TH;
+  const o=off.getContext('2d');
+  const F=fbmTile(rng,[[64,.6],[16,.4]]);
+  const im=o.createImageData(256,256);
+  for(let i=0;i<65536;i++){
+    const r=1-Math.abs(2*F[i]-1);                 // ridged noise = marbrures
+    const v=Math.min(140,Math.max(0,r-0.78)*420); // discret : hauts reliefs seulement
+    im.data[i*4]=im.data[i*4+1]=im.data[i*4+2]=255;
+    im.data[i*4+3]=v*0.7;
+  }
+  const tile=document.createElement('canvas'); tile.width=tile.height=256;
+  tile.getContext('2d').putImageData(im,0,0);
+  for(const z of ZONE_LIST) o.drawImage(tile,z.x,z.y,z.w*1.5,z.h); // étiré = plis de lavage
+  if(garmentKind==='pants') for(const limb of LIMBS){
+    const r=limb.front;
+    const g=o.createRadialGradient(r.x+r.w/2,r.y+r.h*0.5,4,r.x+r.w/2,r.y+r.h*0.5,r.w*0.8);
+    g.addColorStop(0,'rgba(255,255,255,0.38)'); g.addColorStop(1,'rgba(255,255,255,0)');
+    o.fillStyle=g; o.fillRect(r.x,r.y,r.w,r.h);
+    o.strokeStyle='rgba(255,255,255,0.22)'; o.lineWidth=3; o.lineCap='round';
+    for(let i=0;i<3;i++){ // whiskers en haut de cuisse
+      const y=r.y+8+i*7;
+      o.beginPath(); o.moveTo(r.x+6,y);
+      o.quadraticCurveTo(r.x+r.w/2,y+4,r.x+r.w-6,y);
+      o.stroke();
+    }
+  }
+  ctx.save();
+  clipToZones(ctx);
+  ctx.globalCompositeOperation='soft-light';
+  ctx.drawImage(off,0,0);
+  ctx.globalCompositeOperation='screen'; ctx.globalAlpha=0.05;
+  ctx.drawImage(off,0,0);
+  ctx.restore(); ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+}
+/* Accroc réaliste : trou patatoïde + fils de trame tendus + bord effiloché */
+function ripHole(ctx,cx,cy,rw,rh,rng){
+  const path=new Path2D();
+  for(let a=0;a<6.28;a+=0.35){
+    const k=1+(rng()-0.5)*0.5;
+    const px=cx+Math.cos(a)*rw*k, py=cy+Math.sin(a)*rh*k;
+    a===0? path.moveTo(px,py) : path.lineTo(px,py);
+  }
+  path.closePath();
+  ctx.save(); ctx.globalCompositeOperation='destination-out'; ctx.fill(path); ctx.restore();
+  ctx.save(); ctx.clip(path);
+  for(let y=cy-rh; y<cy+rh; y+=2.5+rng()*2.5){    // fils blancs affaissés
+    if(rng()<0.72){
+      ctx.strokeStyle=`rgba(240,236,228,${0.5+rng()*0.4})`;
+      ctx.lineWidth=0.9+rng()*0.8;
+      ctx.beginPath(); ctx.moveTo(cx-rw*1.2,y);
+      ctx.quadraticCurveTo(cx,y+1.5+rng()*2.5,cx+rw*1.2,y);
+      ctx.stroke();
+    }
+  }
+  ctx.fillStyle='rgba(0,0,0,0.16)';               // épaisseur du tissu en haut du trou
+  ctx.fillRect(cx-rw*1.3,cy-rh*1.3,rw*2.6,rh*0.35);
+  ctx.restore();
+  ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=1.5;
+  ctx.stroke(path);                                // bord effiloché blanchi
+}
 /* Rebond demi-résolution : adoucit les bords vectoriels (aspect scan) */
 function softenCanvas(cv){
   const w=cv.width,h=cv.height;
@@ -1154,6 +1217,12 @@ const SHIRT_STYLES = {
   tee: {label:'T-shirt (col rond)', fabric:'solid',
     paint(ctx,p,rng){
       for(const f of SIDE_FACES) band(ctx,TORSO[f],p.accent,8,false);
+      // creux du col en U (convention catalogue)
+      const fr=TORSO.front, cx=fr.x+fr.w/2;
+      ctx.fillStyle=p.dark;
+      ctx.beginPath(); ctx.ellipse(cx,fr.y+8,17,10,0,0,Math.PI); ctx.fill();
+      ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.ellipse(cx,fr.y+8,17,10,0,0.15,Math.PI-0.15); ctx.stroke();
       for(const limb of LIMBS) for(const f of SIDE_FACES) band(ctx,limb[f],p.accent,7,true);
       for(const f of SIDE_FACES) band(ctx,TORSO[f],p.dark,6,true,0.7);
     }},
@@ -1602,18 +1671,12 @@ const PANTS_STYLES = {
       this._ripY=[380+rng()*30, 420+rng()*30]; // mémorise pour after()
     },
     after(ctx,p,rng){
-      // déchirures : fines bandes transparentes, la peau apparaît
+      // accrocs patatoïdes : la peau apparaît entre les fils tendus
       for(const limb of LIMBS){
         const r=limb.front;
-        for(const ry of this._ripY||[390,430]){
-          const y=Math.min(ry, r.y+r.h-18);
-          ctx.clearRect(r.x+8, y, r.w-16, 5);
-          ctx.strokeStyle='rgba(255,255,255,0.75)'; ctx.lineWidth=1.2;
-          for(let x=r.x+9;x<r.x+r.w-9;x+=4){
-            ctx.beginPath(); ctx.moveTo(x,y-2); ctx.lineTo(x+1,y); ctx.stroke();
-            ctx.beginPath(); ctx.moveTo(x+1,y+5); ctx.lineTo(x,y+7); ctx.stroke();
-          }
-        }
+        const n=1+Math.floor(rng()*2);
+        for(let i=0;i<n;i++)
+          ripHole(ctx, r.x+r.w/2+(rng()-0.5)*10, r.y+28+rng()*72, 14+rng()*8, 5+rng()*4, rng);
       }
     },
     noise:2600, noiseAlpha:0.05},
@@ -1818,7 +1881,7 @@ function generateTemplate(kind, opts){
   const rng=mulberry32(opts.seed);
   SKIP_FIT=false;
   const [styleKey, style]=pickStyle(STYLE_SETS[kind], opts.style, rng);
-  const p = style.palette ? style.palette(rng,opts.forcedColor) : makePalette(rng,opts.forcedColor);
+  const p = opts.palette || (style.palette ? style.palette(rng,opts.forcedColor) : makePalette(rng,opts.forcedColor));
   const patKey = opts.pattern!=='auto' ? opts.pattern : (style.fabric||'solid');
 
   ctx.save();
@@ -1830,15 +1893,24 @@ function generateTemplate(kind, opts){
   wrinkles(ctx,rng);
   ctx.restore();
   // trame textile + grain photo sur 100 % des pixels peints
-  applyFabric(ctx,TW,TH,rng, style._cloth||style.cloth||'weave', style.clothStrength);
+  const clothKind=style._cloth||style.cloth||'weave';
+  applyFabric(ctx,TW,TH,rng, clothKind, style.clothStrength);
+  if(clothKind==='denim') denimWash(ctx,rng,kind);
   // adoucissement demi-résolution (tue le rendu vectoriel) puis alpha binaire
   softenCanvas(cv);
   hardenAlpha(ctx,TW,TH);
   // découpes (déchirures, coupes) : après le soften pour garder des bords nets
   if(style.after) style.after(ctx,p,rng,opts);
   if(!style.skipFit && !SKIP_FIT) applyFit(kind, opts.fit||'mixte', ctx, p);
-  return {canvas:cv, styleKey};
+  return {canvas:cv, styleKey, palette:p};
 }
+
+/* Correspondance shirt -> pants pour les ensembles assortis */
+const MATCH_PANTS={
+  tee:'jean', hoodie:'jogging', varsity:'jean', jersey:'jogging',
+  chemise:'costume', pull:'jean', emo:'emo', y2k:'y2k',
+  kawaii:'kawaii', grunge:'grunge', street:'cargo',
+};
 
 function generateTShirt(opts){
   const S=512;
@@ -2061,7 +2133,7 @@ function generateFromImage(kind, img, placement, baseHex, logoScale, shadows){
 }
 
 /* ========================= APERÇU AVATAR ========================= */
-function drawAvatar(cvAvatar, kind, garment){
+function drawAvatar(cvAvatar, kind, garment, pair){
   const ctx=cvAvatar.getContext('2d');
   const W=cvAvatar.width, H=cvAvatar.height;
   ctx.clearRect(0,0,W,H);
@@ -2086,22 +2158,30 @@ function drawAvatar(cvAvatar, kind, garment){
   ctx.fillRect(cx-tw/2,topY+th,aw,ah);                    // jambe g
   ctx.fillRect(cx-tw/2+aw,topY+th,aw,ah);                 // jambe d
 
-  const put=(r,dx,dy,dw,dh)=>ctx.drawImage(garment, r.x,r.y,r.w,r.h, dx,dy,dw,dh);
+  // ensemble : shirt et/ou pants superposés comme en jeu (peau < pants < shirt)
+  const shirtCv = kind==='shirt'? garment : (pair && pair.kind==='shirt'? pair.canvas : null);
+  const pantsCv = kind==='pants'? garment : (pair && pair.kind==='pants'? pair.canvas : null);
+  const put=(src,r,dx,dy,dw,dh)=>ctx.drawImage(src, r.x,r.y,r.w,r.h, dx,dy,dw,dh);
 
-  if(kind==='pants'){
-    put(TORSO.front, cx-tw/2, topY, tw, th);
-    put(LIMB_L.front, cx-tw/2,    topY+th, aw, ah);
-    put(LIMB_R.front, cx-tw/2+aw, topY+th, aw, ah);
-  } else if(kind==='shirt'){
-    ctx.fillStyle=grey; // jambes : pantalon neutre
-    ctx.fillRect(cx-tw/2,topY+th,aw,ah); ctx.fillRect(cx-tw/2+aw,topY+th,aw,ah);
-    put(TORSO.front,  cx-tw/2, topY, tw, th);
-    put(LIMB_L.front, cx-tw/2-aw, topY, aw, ah);
-    put(LIMB_R.front, cx+tw/2,    topY, aw, ah);
-  } else {
+  if(kind==='tshirt'){
     ctx.fillStyle=grey;
     ctx.fillRect(cx-tw/2,topY+th,aw,ah); ctx.fillRect(cx-tw/2+aw,topY+th,aw,ah);
     ctx.drawImage(garment, cx-tw/2, topY, tw, th);
+  } else {
+    if(!pantsCv && shirtCv){ // pantalon neutre sous un shirt seul
+      ctx.fillStyle=grey;
+      ctx.fillRect(cx-tw/2,topY+th,aw,ah); ctx.fillRect(cx-tw/2+aw,topY+th,aw,ah);
+    }
+    if(pantsCv){
+      put(pantsCv, TORSO.front, cx-tw/2, topY, tw, th);
+      put(pantsCv, LIMB_L.front, cx-tw/2,    topY+th, aw, ah);
+      put(pantsCv, LIMB_R.front, cx-tw/2+aw, topY+th, aw, ah);
+    }
+    if(shirtCv){
+      put(shirtCv, TORSO.front,  cx-tw/2, topY, tw, th);
+      put(shirtCv, LIMB_L.front, cx-tw/2-aw, topY, aw, ah);
+      put(shirtCv, LIMB_R.front, cx+tw/2,    topY, aw, ah);
+    }
   }
   ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1.5;
   ctx.strokeRect(cx-tw/2,topY,tw,th);
@@ -2163,6 +2243,7 @@ function refreshTypeUI(){
   $('typeHint').innerHTML=TYPE_HINTS[curType];
   $('chestTextField').style.display = curType==='tshirt' ? '' : 'none';
   $('fitField').style.display = curType==='tshirt' ? 'none' : '';
+  $('setBtn').style.display = curType==='tshirt' ? 'none' : '';
   $('mainCap').textContent = curType==='tshirt' ? 'Image T-Shirt 512×512' : 'Template 585×559';
   refreshStyleSel();
 }
@@ -2386,8 +2467,9 @@ function renderMain(){
       ctx.fillText(lbl[face], r.x+3, r.y+3);
     }
   }
-  drawAvatar($('avatarCanvas'), current.kind, current.canvas);
-  $('seedBadge').textContent = current.seed!=null ? `graine ${current.seed}` : 'image';
+  drawAvatar($('avatarCanvas'), current.kind, current.canvas, current.pair);
+  $('seedBadge').textContent = current.pair ? `ensemble · graine ${current.seed}` :
+    (current.seed!=null ? `graine ${current.seed}` : 'image');
 }
 $('guideChk').addEventListener('change',renderMain);
 
@@ -2437,6 +2519,23 @@ $('genBtn').addEventListener('click',()=>{
     addToGallery(item);
     if(i===0){ current=item; renderMain(); }
   }
+});
+
+/* ----- ensemble assorti (shirt + pants, même palette) ----- */
+$('setBtn').addEventListener('click',()=>{
+  const forced = $('randColor').checked ? null : $('baseColor').value;
+  const fit=$('fitSel').value;
+  const seed=Math.floor(Math.random()*1e9);
+  const shirtStyle = curType==='shirt' ? $('styleSel').value : 'random';
+  const gs=generateTemplate('shirt',{style:shirtStyle, pattern:$('patternSel').value, fit, seed, forcedColor:forced, text:''});
+  const pStyle=MATCH_PANTS[gs.styleKey]||'jean';
+  const gp=generateTemplate('pants',{style:pStyle, pattern:'auto', fit, seed:seed+7, palette:gs.palette});
+  const shirtItem={canvas:gs.canvas, kind:'shirt', seed, name:`shirt-${gs.styleKey}-ensemble-${seed}.png`};
+  const pantsItem={canvas:gp.canvas, kind:'pants', seed:seed+7, name:`pants-${gp.styleKey}-ensemble-${seed}.png`};
+  shirtItem.pair=pantsItem; pantsItem.pair=shirtItem;
+  addToGallery(pantsItem);
+  addToGallery(shirtItem);
+  current=shirtItem; renderMain();
 });
 
 /* ----- génération depuis image ----- */

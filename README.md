@@ -13,6 +13,17 @@ Ouvre simplement `index.html` dans ton navigateur (double-clic), c'est tout.
 
 ## ✨ Fonctionnalités
 
+### Rendu « tissu réel »
+Chaque vêtement passe par un moteur de rendu inspiré des best-sellers du catalogue :
+trame textile pixel par pixel (toile / maille / sergé denim + délavage), éclairage
+volumique par face, coutures, prints érodés façon sérigraphie usée, grain photo,
+palettes désaturées relevées dans le catalogue — plus d'aplats vectoriels.
+
+### Ensembles assortis 🧥+👖
+Un bouton génère le **shirt et le pants coordonnés** (même palette, styles appariés :
+hoodie→jogging, emo→emo skinny, chemise→costume…) et l'aperçu avatar porte les deux.
+C'est le format « matching set » qui marche le mieux sur le catalogue.
+
 ### Mode « Génération auto »
 Des **vrais styles de vêtements**, dont les tendances :
 - **Shirts** : t-shirt col rond, hoodie, veste varsity, maillot de sport, chemise, pull rayé,
