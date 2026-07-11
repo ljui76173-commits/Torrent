@@ -153,6 +153,7 @@
         <label>Sensibilité du détourage : <span id="tolVal">32</span></label>
         <input type="range" id="tolRange" min="4" max="90" value="32">
       </div>
+      <label class="check"><input type="checkbox" id="xeroxChk"> 🖨️ Effet photocopie (print noir &amp; blanc style catalogue)</label>
 
       <div class="field">
         <label>Placement</label>
@@ -343,7 +344,13 @@ function makePalette(rng, forcedHex){
     return buildPalette(b,a);
   }
   const [bx,ax]=pick(rng,CURATED);
-  return paletteFromHexPair(rng,bx,ax);
+  const pal=paletteFromHexPair(rng,bx,ax);
+  // discipline catalogue : base désaturée (l'accent garde sa saturation)
+  if(pal.s>38){
+    const b={h:pal.h, s:38, l:pal.l};
+    return buildPalette(b, hexToHsl(ax));
+  }
+  return pal;
 }
 /* palettes thématiques (utilisées par les styles tendance) */
 function paletteFrom(list){
@@ -353,14 +360,16 @@ function paletteFrom(list){
     return paletteFromHexPair(rng,bx,ax);
   };
 }
-const EMO_P    = paletteFrom([['#141317','#ff2f6d'],['#17171c','#c21f3a'],['#1b1420','#b04ad6'],['#121216','#e8e8ea']]);
-const Y2K_P    = paletteFrom([['#f6a8d8','#ffffff'],['#8ec9f2','#ff8fd0'],['#c9a6f2','#fef08a'],['#9ff0d7','#f6a8d8'],['#f8c8dc','#7cc8f5']]);
-const KAWAII_P = paletteFrom([['#fcd5e5','#8ecbf0'],['#d6ecff','#f9a8c9'],['#e8dcff','#ffd6a8'],['#d8f5dc','#f7b8d4']]);
-const GRUNGE_P = paletteFrom([['#4a2226','#c9b8a8'],['#2e2a26','#a83a2a'],['#39402e','#c9b8a8'],['#26262b','#8a3040']]);
+/* Palettes relevées au pixel dans les références catalogue :
+   bases désaturées, noirs bleutés, jamais de blanc pur */
+const EMO_P    = paletteFrom([['#242428','#7a6aa8'],['#26262b','#c23a52'],['#232326','#9090a8'],['#28242c','#a84a6a']]);
+const Y2K_P    = paletteFrom([['#c8c8d0','#8a5a75'],['#b8c2d4','#6a7a9a'],['#cec4b8','#4a4458']]);
+const KAWAII_P = paletteFrom([['#f0d2df','#b06a86'],['#ecd7e2','#a86380'],['#f4dce8','#bd7492']]);
+const GRUNGE_P = paletteFrom([['#483c3c','#a89c9c'],['#54483c','#c9b8a8'],['#3c3030','#a89c9c'],['#26262b','#8a3040']]);
 const DENIM_P  = (rng,forced)=>{
   if(forced) return makePalette(rng,forced);
-  const b=hexToHsl(pick(rng,['#3b5b85','#2e4a6f','#4a6f9b','#22395c','#5d7fa8']));
-  return buildPalette(b,{h:28,s:65,l:58});
+  const b=hexToHsl(pick(rng,['#3c4860','#2e3c52','#485478','#36435c','#54688a']));
+  return buildPalette(b,{h:28,s:55,l:58});
 };
 
 /* ========================= MOTIFS DE TISSU ========================= */
@@ -612,25 +621,43 @@ function graffitiTag(ctx,cx,cy,word,rng,p,size){
     ctx.beginPath(); ctx.moveTo(dx,cy+size*0.5); ctx.lineTo(dx,cy+size*(0.8+rng()*0.7)); ctx.stroke();
   }
   ctx.globalAlpha=1;
-  ctx.font=`700 ${Math.max(7,size*0.42)}px monospace`;
-  ctx.fillStyle=p.accent;
-  ctx.fillText('#'+(1+Math.floor(rng()*98)), cx+(rng()-.5)*total*0.6, cy+size*0.95);
+  if(size>=34){ // sous 14 px de texte : illisible après compression
+    ctx.font=`700 ${Math.max(14,size*0.42)}px monospace`;
+    ctx.fillStyle=p.accent;
+    ctx.fillText('#'+(1+Math.floor(rng()*98)), cx+(rng()-.5)*total*0.6, cy+size*0.95);
+  }
   ctx.restore();
 }
-function tornHem(ctx,rng){
-  // ourlet déchiré : bas du torse découpé en dents irrégulières (peau visible)
-  const zt=ZONES.torso, yBase=TORSO.front.y+TORSO.front.h;
-  for(let x=zt.x; x<zt.x+zt.w; x+=5){
-    const h=2+rng()*11;
-    ctx.clearRect(x, yBase-h, 5, h);
+function raggedEdge(ctx,rng,x0,x1,yBase,clearBelowTo){
+  // pans déchirés larges (12-28 px) + échancrures profondes + ombre d'épaisseur
+  const segs=[];
+  let x=x0;
+  let depth=6+rng()*10;
+  while(x<x1){
+    const w=Math.min(12+rng()*16, x1-x);
+    depth=Math.max(4, Math.min(24, depth+(rng()-0.5)*12));
+    const deep = rng()<0.12 ? 24+rng()*6 : depth;
+    segs.push([x,w,deep]);
+    ctx.clearRect(x, yBase-deep, w, deep);
+    x+=w;
   }
-  ctx.clearRect(zt.x, yBase, zt.w, zt.y+zt.h-yBase);
+  ctx.clearRect(x0, yBase, x1-x0, clearBelowTo-yBase);
+  for(const [sx,sw,sd] of segs){
+    ctx.fillStyle='rgba(0,0,0,0.35)';           // épaisseur du tissu
+    ctx.fillRect(sx, yBase-sd-2.5, sw, 2.5);
+    ctx.fillStyle='rgba(255,255,255,0.18)';     // fils effilochés
+    ctx.fillRect(sx+sw*0.3, yBase-sd, 1.5, Math.min(4,sd));
+  }
+}
+function tornHem(ctx,rng){
+  const zt=ZONES.torso, yBase=TORSO.front.y+TORSO.front.h;
+  raggedEdge(ctx,rng, zt.x, zt.x+zt.w, yBase, zt.y+zt.h);
 }
 function centerSeam(ctx){
-  ctx.fillStyle='rgba(255,255,255,0.16)';
+  ctx.fillStyle='rgba(255,255,255,0.28)';
   for(const f of ['front','back']){
     const r=TORSO[f];
-    ctx.fillRect(r.x+r.w/2-0.5, r.y, 1, r.h);
+    ctx.fillRect(r.x+r.w/2-1.25, r.y, 2.5, r.h);
   }
 }
 function openJacket(ctx,rng,innerColor,zipper){
@@ -722,15 +749,9 @@ function drawGhost(ctx,cx,cy,s,color,bg){
   }
 }
 function tornSleeves(ctx,rng){
-  // bords de manches déchirés
   const yBase=LIMB_L.front.y+LIMB_L.front.h;
-  for(const z of [ZONES.limbL,ZONES.limbR]){
-    for(let x=z.x;x<z.x+z.w;x+=5){
-      const h=2+rng()*9;
-      ctx.clearRect(x,yBase-h,5,h);
-    }
-    ctx.clearRect(z.x,yBase,z.w,z.y+z.h-yBase);
-  }
+  for(const z of [ZONES.limbL,ZONES.limbR])
+    raggedEdge(ctx,rng, z.x, z.x+z.w, yBase, z.y+z.h);
 }
 function piping(ctx,color){
   // liserés techniques (maillot sport)
@@ -874,45 +895,64 @@ function band(ctx, r, color, hgt, fromBottom, alpha){
   ctx.globalAlpha=1;
 }
 function ribbed(ctx, r, color, hgt, fromBottom){
+  // côtes en période 7 px (sous 5 px : moiré garanti après compression Roblox)
   const y = fromBottom? r.y+r.h-hgt : r.y;
   ctx.fillStyle=color; ctx.fillRect(r.x,y,r.w,hgt);
-  ctx.fillStyle='rgba(0,0,0,0.22)';
-  for(let x=r.x+2;x<r.x+r.w;x+=5) ctx.fillRect(x,y,2,hgt);
+  ctx.fillStyle='rgba(0,0,0,0.24)';
+  for(let x=r.x+3;x<r.x+r.w;x+=7) ctx.fillRect(x,y,3.5,hgt);
 }
 function shadeFaces(ctx){
-  // bandes candidates HAUT/BAS assombries sur toute la largeur des zones
-  ctx.fillStyle='rgba(0,0,0,0.16)';
+  // épaules / dessous : bandes fortes sur toute la largeur des zones
+  ctx.fillStyle='rgba(0,0,0,0.26)';
   const zt=ZONES.torso;
   ctx.fillRect(zt.x,2,zt.w,70);           // dessus torse
   ctx.fillRect(zt.x,204,zt.w,70);         // dessous torse
   for(const z of [ZONES.limbL,ZONES.limbR]){
     ctx.fillRect(z.x,280,z.w,73);         // épaules / haut de jambe
+    ctx.fillStyle='rgba(0,0,0,0.34)';
     ctx.fillRect(z.x,483,z.w,73);         // dessous bras / pied
+    ctx.fillStyle='rgba(0,0,0,0.26)';
   }
   for(const {face,r} of FACES){
-    const a = face==='back'?0.06 : (face==='left'||face==='right')?0.11 : 0;
-    if(a>0){ ctx.fillStyle=`rgba(0,0,0,${a})`; ctx.fillRect(r.x,r.y,r.w,r.h); }
-    const g=ctx.createLinearGradient(0,r.y,0,r.y+r.h);
-    g.addColorStop(0,'rgba(255,255,255,0.06)');
-    g.addColorStop(1,'rgba(0,0,0,0.08)');
+    if(face==='up'||face==='down') continue;
+    if(face==='back'){ ctx.fillStyle='rgba(0,0,0,0.07)'; ctx.fillRect(r.x,r.y,r.w,r.h); }
+    if(face==='left'||face==='right'){ ctx.fillStyle='rgba(0,0,0,0.13)'; ctx.fillRect(r.x,r.y,r.w,r.h); }
+    // éclairage cylindrique : bande claire décalée (lumière 3/4)
+    const g=ctx.createLinearGradient(r.x,0,r.x+r.w,0);
+    g.addColorStop(0.00,'rgba(0,0,0,0.26)');
+    g.addColorStop(0.10,'rgba(0,0,0,0.09)');
+    g.addColorStop(0.30,'rgba(255,255,255,0.08)');
+    g.addColorStop(0.55,'rgba(0,0,0,0)');
+    g.addColorStop(0.86,'rgba(0,0,0,0.09)');
+    g.addColorStop(1.00,'rgba(0,0,0,0.28)');
     ctx.fillStyle=g; ctx.fillRect(r.x,r.y,r.w,r.h);
+    // lumière du haut, asymétrique
+    const v=ctx.createLinearGradient(0,r.y,0,r.y+r.h);
+    v.addColorStop(0,'rgba(255,255,255,0.09)');
+    v.addColorStop(0.25,'rgba(0,0,0,0)');
+    v.addColorStop(1,'rgba(0,0,0,0.16)');
+    ctx.fillStyle=v; ctx.fillRect(r.x,r.y,r.w,r.h);
   }
 }
-/* ----- Shadows réalistes ----- */
+/* ----- Coutures de construction : creux sombre + lèvre éclairée ----- */
 function edgeAO(ctx){
-  for(const {r} of FACES){
-    const d=Math.min(9, Math.floor(r.w/6));
-    const sides=[
-      ctx.createLinearGradient(r.x,0,r.x+d,0),
-      ctx.createLinearGradient(r.x+r.w,0,r.x+r.w-d,0),
-      ctx.createLinearGradient(0,r.y,0,r.y+d),
-      ctx.createLinearGradient(0,r.y+r.h,0,r.y+r.h-d),
-    ];
-    for(const g of sides){ g.addColorStop(0,'rgba(0,0,0,0.16)'); g.addColorStop(1,'rgba(0,0,0,0)'); }
-    ctx.fillStyle=sides[0]; ctx.fillRect(r.x,r.y,d,r.h);
-    ctx.fillStyle=sides[1]; ctx.fillRect(r.x+r.w-d,r.y,d,r.h);
-    ctx.fillStyle=sides[2]; ctx.fillRect(r.x,r.y,r.w,d);
-    ctx.fillStyle=sides[3]; ctx.fillRect(r.x,r.y+r.h-d,r.w,d);
+  for(const {face,r} of FACES){
+    if(face==='up'||face==='down') continue;
+    // bords verticaux (emmanchures / côtés)
+    ctx.fillStyle='rgba(0,0,0,0.28)';
+    ctx.fillRect(r.x,r.y,2,r.h);
+    ctx.fillRect(r.x+r.w-2,r.y,2,r.h);
+    ctx.fillStyle='rgba(255,255,255,0.10)';
+    ctx.fillRect(r.x+2,r.y,1,r.h);
+    ctx.fillRect(r.x+r.w-3,r.y,1,r.h);
+    // ombre d'ourlet en bas de face
+    ctx.fillStyle='rgba(0,0,0,0.18)';
+    ctx.fillRect(r.x,r.y+r.h-2,r.w,2);
+  }
+  // couture d'épaule au sommet des membres
+  ctx.fillStyle='rgba(0,0,0,0.30)';
+  for(const limb of LIMBS) for(const f of SIDE_FACES){
+    const r=limb[f]; ctx.fillRect(r.x,r.y,r.w,2.5);
   }
 }
 function wrinkles(ctx,rng){
@@ -923,14 +963,17 @@ function wrinkles(ctx,rng){
     for(let i=0;i<n;i++){
       const y=r.y+r.h*(0.22+rng()*0.62);
       const bend=(rng()<.5?1:-1)*(4+rng()*8);
-      ctx.strokeStyle=`rgba(0,0,0,${0.05+rng()*0.05})`;
-      ctx.lineWidth=2.5+rng()*3;
-      ctx.beginPath();
-      ctx.moveTo(r.x+3,y);
-      ctx.quadraticCurveTo(r.x+r.w/2, y+bend, r.x+r.w-3, y+(rng()-.5)*5);
-      ctx.stroke();
-      ctx.strokeStyle=`rgba(255,255,255,${0.03+rng()*0.03})`;
-      ctx.lineWidth=2;
+      // pli : ombre large puis cœur plus marqué, et rehaut au-dessus
+      for(const [w,a] of [[6,0.06],[3,0.10]]){
+        ctx.strokeStyle=`rgba(0,0,0,${a+rng()*0.04})`;
+        ctx.lineWidth=w;
+        ctx.beginPath();
+        ctx.moveTo(r.x+3,y);
+        ctx.quadraticCurveTo(r.x+r.w/2, y+bend, r.x+r.w-3, y+(rng()-.5)*5);
+        ctx.stroke();
+      }
+      ctx.strokeStyle=`rgba(255,255,255,${0.05+rng()*0.04})`;
+      ctx.lineWidth=1.8;
       ctx.beginPath();
       ctx.moveTo(r.x+3,y-3);
       ctx.quadraticCurveTo(r.x+r.w/2, y-3+bend, r.x+r.w-3, y-3);
@@ -958,6 +1001,122 @@ function tshirtShadows(ctx,S,rng){
     ctx.quadraticCurveTo(S/2, y-9+bend, S-10, y-9);
     ctx.stroke();
   }
+}
+/* =====================================================================
+   MOTEUR DE RENDU « TISSU RÉEL »
+   Bruit de valeur multi-octave tuilable + trame textile par pixel +
+   éclairage volumique + prints érodés + adoucissement demi-résolution.
+   ===================================================================== */
+function noiseTile(rng,size,period){
+  // sécurise : la période doit diviser la taille (sinon NaN silencieux)
+  const n=Math.max(1,Math.round(size/period));
+  period=size/n;
+  const lat=new Float32Array((n+1)*(n+1));
+  for(let j=0;j<n;j++) for(let i=0;i<n;i++) lat[j*(n+1)+i]=rng();
+  for(let j=0;j<=n;j++) lat[j*(n+1)+n]=lat[(j%n)*(n+1)];
+  for(let i=0;i<=n;i++) lat[n*(n+1)+i]=lat[i%n];
+  const out=new Float32Array(size*size);
+  const sm=t=>t*t*(3-2*t);
+  for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+    const gx=x/period, gy=y/period, x0=gx|0, y0=gy|0;
+    const fx=sm(gx-x0), fy=sm(gy-y0), r=y0*(n+1)+x0;
+    const a=lat[r], b=lat[r+1], c=lat[r+n+1], e=lat[r+n+2];
+    out[y*size+x]=a+(b-a)*fx+(c-a)*fy+(a-b-c+e)*fx*fy;
+  }
+  return out;
+}
+function fbmTile(rng,specs){
+  specs=specs||[[64,.5],[32,.25],[16,.15],[8,.10]];
+  const acc=new Float32Array(256*256);
+  for(const [p,w] of specs){
+    const t=noiseTile(rng,256,p);
+    for(let i=0;i<acc.length;i++) acc[i]+=t[i]*w;
+  }
+  return acc;
+}
+let GRAIN=null; // tuile de grain chromatique partagée
+function grainTile(rng){
+  if(GRAIN) return GRAIN;
+  GRAIN=new Uint8Array(65536);
+  for(let i=0;i<65536;i++) GRAIN[i]=(rng()*256)|0;
+  return GRAIN;
+}
+/* Trame textile + grain photo + courbe : module TOUS les pixels peints.
+   kind : 'weave' (toile) | 'knit' (maille) | 'denim' (sergé) */
+function applyFabric(ctx,W,H,rng,kind,strength){
+  strength=strength==null?0.13:strength;
+  const id=ctx.getImageData(0,0,W,H), d=id.data;
+  const FBM=fbmTile(rng), G=grainTile(rng);
+  const P=3;
+  const jx=new Float32Array(Math.ceil(W/P)+1), jy=new Float32Array(Math.ceil(H/P)+1);
+  for(let i=0;i<jx.length;i++) jx[i]=0.95+rng()*0.10;
+  for(let i=0;i<jy.length;i++) jy[i]=0.95+rng()*0.10;
+  const streak=new Float32Array(W); // stries verticales du denim
+  { let v=0; for(let i=0;i<W;i++){ v=v*0.9+(rng()-0.5)*0.05; streak[i]=1+Math.max(-0.07,Math.min(0.07,v)); } }
+  for(let y=0;y<H;y++){
+    const ty=(y/P)|0;
+    for(let x=0;x<W;x++){
+      const i=(y*W+x)*4;
+      if(d[i+3]===0) continue;
+      const tx=(x/P)|0;
+      let t;
+      if(kind==='denim'){
+        t=(((x+2*y)%6)<2)?1.10:0.93;
+        t*=streak[x];
+      } else if(kind==='knit'){
+        const col=x%5, row=(y+(col<3?0:2))%5;
+        t=row===0?1.08 : row===2?0.93 : 1;
+      } else {
+        const over=(tx+ty)&1;
+        t=over?(y%P===1?1.08:0.96):(x%P===1?1.06:0.94);
+      }
+      t*=(jx[tx]+jy[ty])*0.5;
+      const n=FBM[((y&255)<<8)|(x&255)];
+      t=1+(t-1)*0.8+strength*(n-0.5)*2;
+      const gi=(y*W+x)&65535;
+      // grain décorrélé par canal + courbe (jamais de noirs/blancs purs)
+      d[i]  =Math.max(12,Math.min(243, d[i]  *t + (G[gi]-128)*0.055));
+      d[i+1]=Math.max(12,Math.min(243, d[i+1]*t + (G[(gi+7777)&65535]-128)*0.055));
+      d[i+2]=Math.max(13,Math.min(245, d[i+2]*t + (G[(gi+31337)&65535]-128)*0.055));
+    }
+  }
+  ctx.putImageData(id,0,0);
+}
+/* Print érodé : dessiné sur offscreen, encre rongée par le bruit, posé en multiply/normal */
+function printWorn(ctx,W,H,drawFn,rng,wear,mode){
+  wear=wear==null?0.32:wear;
+  const off=document.createElement('canvas'); off.width=W; off.height=H;
+  const o=off.getContext('2d');
+  drawFn(o);
+  const id=o.getImageData(0,0,W,H), d=id.data;
+  const HF=fbmTile(rng,[[4,.6],[2,.4]]), LF=fbmTile(rng,[[64,.6],[16,.4]]);
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const i=(y*W+x)*4; if(d[i+3]===0) continue;
+    const e=HF[((y&255)<<8)|(x&255)]*0.6 + LF[(((y*2)&255)<<8)|((x*2)&255)]*0.4;
+    if(e<wear) d[i+3]=0;
+    else d[i+3]=Math.min(d[i+3], d[i+3]*Math.min(1,(e-wear)*4));
+  }
+  o.putImageData(id,0,0);
+  ctx.save();
+  ctx.globalCompositeOperation=mode||'source-over';
+  ctx.globalAlpha=0.95;
+  ctx.drawImage(off,0,0);
+  ctx.restore();
+}
+/* Rebond demi-résolution : adoucit les bords vectoriels (aspect scan) */
+function softenCanvas(cv){
+  const w=cv.width,h=cv.height;
+  const half=document.createElement('canvas'); half.width=w>>1; half.height=h>>1;
+  half.getContext('2d').drawImage(cv,0,0,w>>1,h>>1);
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,w,h);
+  ctx.drawImage(half,0,0,w,h);
+}
+/* Re-durcit l'alpha (anti-frange de compression Roblox) */
+function hardenAlpha(ctx,W,H){
+  const id=ctx.getImageData(0,0,W,H), d=id.data;
+  for(let i=3;i<d.length;i+=4) d[i]=d[i]>110?255:0;
+  ctx.putImageData(id,0,0);
 }
 function fabricNoise(ctx,rng,W,H,amt,alpha){
   amt=amt||900; alpha=alpha||0.03;
@@ -998,7 +1157,7 @@ const SHIRT_STYLES = {
       for(const limb of LIMBS) for(const f of SIDE_FACES) band(ctx,limb[f],p.accent,7,true);
       for(const f of SIDE_FACES) band(ctx,TORSO[f],p.dark,6,true,0.7);
     }},
-  hoodie: {label:'Hoodie', fabric:'solid',
+  hoodie: {label:'Hoodie', fabric:'solid', cloth:'knit',
     paint(ctx,p,rng){
       const fr=TORSO.front, bk=TORSO.back, cx=fr.x+fr.w/2;
       for(const f of SIDE_FACES) band(ctx,TORSO[f],p.dark,12,false);
@@ -1065,7 +1224,7 @@ const SHIRT_STYLES = {
       ctx.strokeRect(fr.x+16,fr.y+40,26,24);
       for(const limb of LIMBS) for(const f of SIDE_FACES) band(ctx,limb[f],p.dark,8,true,0.65);
     }},
-  pull: {label:'Pull rayé', fabric:'stripesH',
+  pull: {label:'Pull rayé', fabric:'stripesH', cloth:'knit',
     paint(ctx,p,rng){
       for(const f of SIDE_FACES) ribbed(ctx,TORSO[f],p.dark,9,false);
       for(const f of SIDE_FACES) ribbed(ctx,TORSO[f],p.dark,9,true);
@@ -1075,12 +1234,13 @@ const SHIRT_STYLES = {
     paint(ctx,p,rng){
       centerSeam(ctx);
       const fr=TORSO.front;
-      // graphisme central : tag graffiti avec éclaboussure OU croquis griffonné
+      // graphisme héro : 70-90 % du torse, légèrement décentré, encre érodée
+      const hx=fr.x+fr.w/2+(rng()-0.5)*14, hy=fr.y+48+rng()*14;
       if(rng()<0.5)
-        graffitiTag(ctx, fr.x+fr.w/2, fr.y+52,
-          pick(rng,['ENYGMA','OBLIVN','SORROW','H3X','VOID','N0CTA']), rng, p, 20);
+        printWorn(ctx,TW,TH,o=>graffitiTag(o, hx, hy,
+          pick(rng,['ENYGMA','OBLIVN','SORROW','H3X','VOID','N0CTA']), rng, p, 27), rng, 0.30);
       else
-        scribbleArt(ctx, fr.x+fr.w/2, fr.y+62, 44, rng, 'rgba(244,244,246,0.9)');
+        printWorn(ctx,TW,TH,o=>scribbleArt(o, hx, hy+14, 55, rng, 'rgba(240,240,244,0.95)'), rng, 0.22);
       // sparkles éparpillés partout (torse + bras)
       const faces=[TORSO.front,TORSO.back,TORSO.left,TORSO.right,
         ...LIMBS.flatMap(l=>SIDE_FACES.map(f=>l[f]))];
@@ -1094,22 +1254,25 @@ const SHIRT_STYLES = {
   y2k: {label:'✨ Y2K', fabric:'solid',
     palette(rng,forced){
       this._v=Math.floor(rng()*3); // 0: hoodie gothique, 1: veste en jean, 2: étoiles
+      this._cloth = this._v===1 ? 'denim' : (this._v===0 ? 'knit' : 'weave');
       if(forced) return makePalette(rng,forced);
-      if(this._v===0) return paletteFromHexPair(rng,'#f2f0ec','#1a1a1e');
+      if(this._v===0) return paletteFromHexPair(rng,'#c8c8d0','#1a1a1e');
       if(this._v===1){
-        const b=hexToHsl(pick(rng,['#4a6a94','#3c5a82','#5d7ba3']));
-        return buildPalette(b,{h:0,s:0,l:96});
+        const b=hexToHsl(pick(rng,['#3c4860','#485478','#36435c']));
+        return buildPalette(b,{h:220,s:8,l:82});
       }
-      return paletteFromHexPair(rng,'#e9e1d1','#17171a');
+      return paletteFromHexPair(rng,'#d8d2c4','#17171a');
     },
     paint(ctx,p,rng){
       const v=this._v??0;
       const fr=TORSO.front, bk=TORSO.back;
-      if(v===0){ // hoodie blanc ouvert, prints gothiques ailés
+      if(v===0){ // hoodie ouvert, prints gothiques ailés érodés
         openJacket(ctx,rng,'#1c1c22',true);
-        wingsCross(ctx, fr.x+fr.w*0.24, fr.y+52, 30, 'rgba(22,22,26,0.85)');
-        wingsCross(ctx, fr.x+fr.w*0.76, fr.y+52, 30, 'rgba(22,22,26,0.85)');
-        wingsCross(ctx, bk.x+bk.w/2, bk.y+56, 46, 'rgba(22,22,26,0.85)');
+        printWorn(ctx,TW,TH,o=>{
+          wingsCross(o, fr.x+fr.w*0.24, fr.y+54, 36, 'rgba(22,22,26,0.9)');
+          wingsCross(o, fr.x+fr.w*0.76, fr.y+54, 36, 'rgba(22,22,26,0.9)');
+          wingsCross(o, bk.x+bk.w/2, bk.y+60, 54, 'rgba(22,22,26,0.9)');
+        }, rng, 0.28, 'multiply');
         scatterInFaces(ctx,rng,LIMBS.flatMap(l=>SIDE_FACES.map(f=>l[f])),6,
           (x,y,r2)=>wingsCross(ctx,x,y,9+r2()*6,'rgba(22,22,26,0.5)'));
         const cx=fr.x+fr.w/2; // cordons
@@ -1166,8 +1329,8 @@ const SHIRT_STYLES = {
         (x,y,r2)=>drawHeart(ctx,x,y,3+r2()*3,'rgba(255,255,255,0.75)',false));
       fakeGlyphs(ctx, fr.x+8, fr.y+8, 2, 12, 'rgba(255,255,255,0.55)', rng);
       fakeGlyphs(ctx, fr.x+fr.w-32, fr.y+96, 2, 10, 'rgba(255,255,255,0.5)', rng);
-      // ourson gloomy + nœud (corps plus soutenu que le fond)
-      drawBear(ctx, fr.x+fr.w/2, fr.y+58, 36,
+      // ourson gloomy + nœud — taille miniature-catalogue (~80 % de la face)
+      drawBear(ctx, fr.x+fr.w/2+(rng()-0.5)*8, fr.y+60, 48,
         hslStr(p.h, Math.min(92,p.s+18), Math.max(38,p.l-14)), p.accent, '#ffffff');
       drawHeart(ctx, bk.x+bk.w/2, bk.y+56, 14, '#ffffff', false);
       // épaules blanches à bord festonné (petites manches)
@@ -1198,11 +1361,14 @@ const SHIRT_STYLES = {
     paint(ctx,p,rng,opts){
       const fr=TORSO.front;
       if(opts && opts.fit==='femme'){
+        SKIP_FIT=true; // le corset gère sa propre coupe (ourlet déchiré + bras nu)
         // corset squelette : fond bordeaux uni + cage thoracique griffonnée
-        ctx.fillStyle = opts.forcedColor || pick(rng,['#5a1e24','#4a161c','#6b2430']);
+        ctx.fillStyle = opts.forcedColor || pick(rng,['#482424','#542424','#3c1818']);
         for(const z of ZONE_LIST) ctx.fillRect(z.x,z.y,z.w,z.h);
-        drawRibcage(ctx, fr.x+fr.w/2, fr.y+64, fr.w*0.72, 104, 'rgba(245,242,238,0.9)', rng);
-        drawRibcage(ctx, TORSO.back.x+TORSO.back.w/2, TORSO.back.y+64, TORSO.back.w*0.6, 96, 'rgba(245,242,238,0.55)', rng);
+        printWorn(ctx,TW,TH,o=>{
+          drawRibcage(o, fr.x+fr.w/2, fr.y+64, fr.w*0.78, 110, 'rgba(216,204,192,0.95)', rng);
+          drawRibcage(o, TORSO.back.x+TORSO.back.w/2, TORSO.back.y+64, TORSO.back.w*0.66, 100, 'rgba(216,204,192,0.6)', rng);
+        }, rng, 0.22);
         // collier de perles
         ctx.fillStyle='#f2efe9';
         for(let i=0;i<9;i++){
@@ -1266,22 +1432,23 @@ const SHIRT_STYLES = {
         ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.fillStyle='#f2f2f4';
         ctx.fillText(word, fr.x+fr.w/2, fr.y+44);
-        ctx.font='700 10px monospace';
+        ctx.font='700 14px monospace';
         ctx.fillText('✦', fr.x+fr.w/2, fr.y+18);
-        ctx.fillText('M', fr.x+22, fr.y+14); ctx.fillText('W', fr.x+fr.w-22, fr.y+14);
         for(const f of SIDE_FACES) band(ctx,TORSO[f],p.dark,8,true,0.7);
-      } else if(v===1){ // dents photocopiées empilées
-        drawTeethXerox(ctx, fr.x+fr.w/2, fr.y+46, 100, 58, rng);
-        drawTeethXerox(ctx, fr.x+fr.w/2, fr.y+104, 108, 60, rng);
-        drawTeethXerox(ctx, bk.x+bk.w/2, bk.y+66, 96, 56, rng);
+      } else if(v===1){ // dents photocopiées empilées, encre écrasée
+        printWorn(ctx,TW,TH,o=>{
+          drawTeethXerox(o, fr.x+fr.w/2-4, fr.y+48, 112, 60, rng);
+          drawTeethXerox(o, fr.x+fr.w/2+3, fr.y+108, 118, 62, rng);
+          drawTeethXerox(o, bk.x+bk.w/2, bk.y+68, 106, 58, rng);
+        }, rng, 0.24, 'multiply');
       } else { // collage de numéros tamponnés
-        stampNumbers(ctx, fr, rng, p.accent);
-        stampNumbers(ctx, bk, rng, 'rgba(29,29,32,0.6)');
-        // bribes de texte journal
-        ctx.font='700 8px monospace'; ctx.fillStyle='rgba(29,29,32,0.5)';
+        printWorn(ctx,TW,TH,o=>stampNumbers(o, fr, rng, p.accent), rng, 0.4, 'multiply');
+        stampNumbers(ctx, bk, rng, 'rgba(29,29,32,0.55)');
+        // bribes de texte journal (≥ 14 px sinon bouillie à la compression)
+        ctx.font='700 14px monospace'; ctx.fillStyle='rgba(29,29,32,0.55)';
         ctx.textAlign='left';
-        for(let i=0;i<5;i++)
-          ctx.fillText(pick(rng,['1899','NEWS','no.7','EST.','PRESS']), fr.x+4+rng()*90, fr.y+8+rng()*112);
+        for(let i=0;i<3;i++)
+          ctx.fillText(pick(rng,['1899','NEWS','no.7','EST.']), fr.x+4+rng()*70, fr.y+14+rng()*104);
       }
     },
     after(ctx,p,rng){
@@ -1292,7 +1459,7 @@ const SHIRT_STYLES = {
 
 /* ========================= STYLES : PANTS ========================= */
 const PANTS_STYLES = {
-  jean: {label:'Jean', fabric:'solid', palette:DENIM_P,
+  jean: {label:'Jean', fabric:'solid', palette:DENIM_P, cloth:'denim', clothStrength:0.16,
     paint(ctx,p,rng){
       for(const f of SIDE_FACES) band(ctx,TORSO[f],p.darker,13,false);
       ctx.fillStyle=p.darker; const zt=ZONES.torso; ctx.fillRect(zt.x,2,zt.w,70);
@@ -1302,7 +1469,7 @@ const PANTS_STYLES = {
         ctx.fillRect(r.x+14,r.y,7,13); ctx.fillRect(r.x+r.w-21,r.y,7,13); ctx.fillRect(r.x+r.w/2-3.5,r.y,7,13);
       }
       ctx.fillStyle=p.accent; ctx.beginPath(); ctx.arc(cx,fr.y+7,3.5,0,7); ctx.fill();
-      ctx.strokeStyle=p.accent; ctx.lineWidth=1.5; ctx.setLineDash([4,3]); ctx.globalAlpha=.85;
+      ctx.strokeStyle=p.accent; ctx.lineWidth=2.5; ctx.setLineDash([5,4]); ctx.globalAlpha=.9;
       ctx.beginPath(); ctx.moveTo(cx,fr.y+13); ctx.lineTo(cx,fr.y+44); ctx.quadraticCurveTo(cx-10,fr.y+44,cx-10,fr.y+13); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(fr.x+6,fr.y+16); ctx.quadraticCurveTo(fr.x+34,fr.y+24,fr.x+36,fr.y+52); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(fr.x+fr.w-6,fr.y+16); ctx.quadraticCurveTo(fr.x+fr.w-34,fr.y+24,fr.x+fr.w-36,fr.y+52); ctx.stroke();
@@ -1319,7 +1486,7 @@ const PANTS_STYLES = {
       for(const limb of LIMBS) for(const f of SIDE_FACES) band(ctx,limb[f],p.dark,7,true,0.8);
     },
     noise:2600, noiseAlpha:0.05},
-  jogging: {label:'Jogging', fabric:'solid',
+  jogging: {label:'Jogging', fabric:'solid', cloth:'knit',
     paint(ctx,p,rng){
       for(const f of SIDE_FACES) ribbed(ctx,TORSO[f],p.dark,12,false);
       ctx.fillStyle=p.dark; const zt=ZONES.torso; ctx.fillRect(zt.x,2,zt.w,70);
@@ -1424,7 +1591,7 @@ const PANTS_STYLES = {
       for(const limb of LIMBS) for(const f of SIDE_FACES) band(ctx,limb[f],p.accent,5,true,0.9);
     },
     noise:1600, noiseAlpha:0.04},
-  grunge: {label:'🎸 Grunge (jean troué)', fabric:'solid',
+  grunge: {label:'🎸 Grunge (jean troué)', fabric:'solid', cloth:'denim', clothStrength:0.16,
     palette:(rng,forced)=>{
       if(forced) return makePalette(rng,forced);
       const b=hexToHsl(pick(rng,['#2e3a4d','#31404f','#243244']));
@@ -1504,11 +1671,12 @@ const TSHIRT_STYLES = {
   emo: {label:'🖤 Emo', palette:EMO_P, paint(ctx,S,p,rng,opts){
     ctx.fillStyle=p.base; ctx.fillRect(0,0,S,S);
     if(!opts.text){
-      if(rng()<0.5) scribbleArt(ctx,S/2,S*0.48,170,rng,'rgba(244,244,246,0.9)');
-      else graffitiTag(ctx,S/2,S*0.46,
-        pick(rng,['ENYGMA','OBLIVN','SORROW','H3X','VOID','N0CTA']),rng,p,64);
+      const hx=S/2+(rng()-0.5)*S*0.12, hy=S*0.47;
+      if(rng()<0.5) printWorn(ctx,S,S,o=>scribbleArt(o,hx,hy,190,rng,'rgba(240,240,244,0.95)'),rng,0.22);
+      else printWorn(ctx,S,S,o=>graffitiTag(o,hx,hy,
+        pick(rng,['ENYGMA','OBLIVN','SORROW','H3X','VOID','N0CTA']),rng,p,72),rng,0.30);
     }
-    for(let i=0;i<11;i++) drawSparkle(ctx,rng()*S,rng()*S,8+rng()*18,'rgba(255,255,255,0.75)');
+    for(let i=0;i<11;i++) drawSparkle(ctx,rng()*S,rng()*S,8+rng()*18,'rgba(235,235,242,0.8)');
     for(let i=0;i<4;i++) drawSparkle(ctx,rng()*S,rng()*S,6+rng()*10,p.accent);
   }},
   y2k: {label:'✨ Y2K',
@@ -1524,8 +1692,8 @@ const TSHIRT_STYLES = {
     // texture maille : fines lignes horizontales
     ctx.fillStyle='rgba(0,0,0,0.045)';
     for(let y=0;y<S;y+=5) ctx.fillRect(0,y,S,1.5);
-    if(v===0){ // gros fantôme décentré + katakanas
-      if(!opts.text) drawGhost(ctx,S*0.60,S*0.42,180,p.accent,p.base);
+    if(v===0){ // gros fantôme décentré + katakanas, encre écrasée
+      if(!opts.text) printWorn(ctx,S,S,o=>drawGhost(o,S*0.60,S*0.42,190,p.accent,p.base),rng,0.24,'multiply');
       fakeGlyphs(ctx,S*0.16,S*0.8,4,34,p.accent,rng);
       ctx.strokeStyle=p.accent; ctx.globalAlpha=.35; ctx.lineWidth=2; // volutes déco
       for(let i=0;i<4;i++){
@@ -1537,8 +1705,8 @@ const TSHIRT_STYLES = {
       ctx.fillStyle=p.accent; ctx.globalAlpha=.5;
       for(let x=0;x<S;x+=18) ctx.fillRect(x,S-16,10,4);
       ctx.globalAlpha=1;
-    } else if(v===1){ // croix gothique ailée
-      if(!opts.text) wingsCross(ctx,S/2,S*0.45,150,p.accent);
+    } else if(v===1){ // croix gothique ailée érodée
+      if(!opts.text) printWorn(ctx,S,S,o=>wingsCross(o,S/2,S*0.45,165,p.accent),rng,0.26,'multiply');
       for(let i=0;i<6;i++) wingsCross(ctx,rng()*S,S*0.7+rng()*S*0.25,18+rng()*16,
         `rgba(23,23,26,${0.35+rng()*0.3})`);
     } else { // imprimé étoiles
@@ -1570,10 +1738,12 @@ const TSHIRT_STYLES = {
     ctx.fillStyle=p.base; ctx.fillRect(0,0,S,S);
     if(!opts.text){
       if((this._v??0)===0){
-        drawTeethXerox(ctx,S/2,S*0.33,S*0.6,S*0.28,rng);
-        drawTeethXerox(ctx,S/2,S*0.66,S*0.64,S*0.29,rng);
+        printWorn(ctx,S,S,o=>{
+          drawTeethXerox(o,S/2-S*0.02,S*0.33,S*0.64,S*0.29,rng);
+          drawTeethXerox(o,S/2+S*0.02,S*0.66,S*0.68,S*0.30,rng);
+        },rng,0.22,'multiply');
       } else {
-        stampNumbers(ctx,{x:S*0.08,y:S*0.06,w:S*0.84,h:S*0.86},rng,p.accent);
+        printWorn(ctx,S,S,o=>stampNumbers(o,{x:S*0.08,y:S*0.06,w:S*0.84,h:S*0.86},rng,p.accent),rng,0.4,'multiply');
         ctx.font='700 16px monospace'; ctx.fillStyle='rgba(29,29,32,0.5)'; ctx.textAlign='left';
         for(let i=0;i<6;i++)
           ctx.fillText(pick(rng,['1899','NEWS','no.7','EST.','PRESS']), rng()*S*0.8, 20+rng()*S*0.9);
@@ -1583,7 +1753,7 @@ const TSHIRT_STYLES = {
   grunge: {label:'🎸 Grunge', palette:GRUNGE_P, paint(ctx,S,p,rng,opts){
     PATTERNS.tiedye(ctx,S,S,{...p,light:p.dark,h:p.h,s:p.s*0.6},rng);
     ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(0,0,S,S);
-    if(!opts.text) drawSkull(ctx,S/2,S/2-10,110,p.light,p.darker);
+    if(!opts.text) printWorn(ctx,S,S,o=>drawSkull(o,S/2,S/2-10,125,p.light,p.darker),rng,0.28);
     ctx.strokeStyle='rgba(255,255,255,0.12)'; ctx.lineWidth=2; ctx.lineCap='round';
     for(let i=0;i<26;i++){
       const x=rng()*S,y=rng()*S,len=10+rng()*30;
@@ -1641,10 +1811,12 @@ function pickStyle(set, key, rng){
   return [k, set[k]];
 }
 
+let SKIP_FIT=false; // un style peut annuler la coupe générique (ex : corset)
 function generateTemplate(kind, opts){
   const cv=document.createElement('canvas'); cv.width=TW; cv.height=TH;
   const ctx=cv.getContext('2d');
   const rng=mulberry32(opts.seed);
+  SKIP_FIT=false;
   const [styleKey, style]=pickStyle(STYLE_SETS[kind], opts.style, rng);
   const p = style.palette ? style.palette(rng,opts.forcedColor) : makePalette(rng,opts.forcedColor);
   const patKey = opts.pattern!=='auto' ? opts.pattern : (style.fabric||'solid');
@@ -1656,10 +1828,15 @@ function generateTemplate(kind, opts){
   shadeFaces(ctx);
   edgeAO(ctx);
   wrinkles(ctx,rng);
-  fabricNoise(ctx,rng,TW,TH,style.noise,style.noiseAlpha);
-  if(style.after) style.after(ctx,p,rng,opts);
-  if(!style.skipFit) applyFit(kind, opts.fit||'mixte', ctx, p);
   ctx.restore();
+  // trame textile + grain photo sur 100 % des pixels peints
+  applyFabric(ctx,TW,TH,rng, style._cloth||style.cloth||'weave', style.clothStrength);
+  // adoucissement demi-résolution (tue le rendu vectoriel) puis alpha binaire
+  softenCanvas(cv);
+  hardenAlpha(ctx,TW,TH);
+  // découpes (déchirures, coupes) : après le soften pour garder des bords nets
+  if(style.after) style.after(ctx,p,rng,opts);
+  if(!style.skipFit && !SKIP_FIT) applyFit(kind, opts.fit||'mixte', ctx, p);
   return {canvas:cv, styleKey};
 }
 
@@ -1677,7 +1854,8 @@ function generateTShirt(opts){
   g.addColorStop(0,'rgba(255,255,255,0.05)'); g.addColorStop(1,'rgba(0,0,0,0.09)');
   ctx.fillStyle=g; ctx.fillRect(0,0,S,S);
   tshirtShadows(ctx,S,rng);
-  fabricNoise(ctx,rng,S,S,800,0.028);
+  applyFabric(ctx,S,S,rng, style.cloth||'knit', 0.11);
+  softenCanvas(cv);
 
   if(opts.text){
     const size=Math.min(120, Math.floor(S*0.9/Math.max(3,opts.text.length)*1.7));
@@ -1790,6 +1968,35 @@ function cropToContent(canvas){
   c.width=maxX-minX+1; c.height=maxY-minY+1;
   c.getContext('2d').drawImage(canvas, -minX, -minY);
   return c;
+}
+
+/* Effet photocopie : gris → toner bruité → seuillage doux → stries + poussière */
+function xeroxify(canvas,rng){
+  const W=canvas.width, H=canvas.height, x=canvas.getContext('2d');
+  const t=document.createElement('canvas');
+  t.width=Math.max(1,W>>1); t.height=Math.max(1,H>>1);
+  t.getContext('2d').drawImage(canvas,0,0,t.width,t.height);
+  x.clearRect(0,0,W,H); x.drawImage(t,0,0,W,H);      // bavure d'encre (flou ~1px)
+  const id=x.getImageData(0,0,W,H), d=id.data;
+  const FBM=fbmTile(rng,[[64,.5],[16,.3],[4,.2]]);
+  const streak=new Float32Array(W);                   // bandes verticales du tambour
+  { let v=0; for(let i=0;i<W;i++){ v=v*0.92+(rng()-0.5)*4; streak[i]=v; } }
+  const sstep=(a,b,v)=>{ v=Math.max(0,Math.min(1,(v-a)/(b-a))); return v*v*(3-2*v); };
+  for(let y=0;y<H;y++){
+    const scan=((y%3)===0?-6:2);
+    for(let px=0;px<W;px++){
+      const i=(y*W+px)*4;
+      if(d[i+3]===0) continue;                        // garde le détourage
+      let g=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2];
+      g+=(FBM[((y&255)<<8)|(px&255)]-0.5)*44+streak[px]+scan;
+      let v=sstep(86,150,g);
+      let out=14+v*228;                               // ni noir ni blanc purs
+      if(rng()<0.003) out=v>0.5?45:215;               // poussière de toner
+      d[i]=out; d[i+1]=out*0.995; d[i+2]=out*0.96;    // teinte papier chaude
+    }
+  }
+  x.putImageData(id,0,0);
+  return canvas;
 }
 
 function preprocessImage(img, removeBg, tolerance){
@@ -2138,6 +2345,7 @@ dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');lo
 function reprocessImage(){
   if(!rawImg) return;
   processedImg = preprocessImage(rawImg, $('removeBgChk').checked, parseInt($('tolRange').value,10));
+  if($('xeroxChk').checked) processedImg = xeroxify(processedImg, mulberry32(Math.floor(Math.random()*1e9)));
   dz.innerHTML = $('removeBgChk').checked ? 'Image détourée ✂️ (aperçu)<br>' : 'Image chargée ✔<br>';
   const th=document.createElement('canvas');
   const sc=Math.min(1, 220/Math.max(processedImg.width,processedImg.height));
@@ -2157,6 +2365,7 @@ $('removeBgChk').addEventListener('change',()=>{
 });
 $('tolRange').addEventListener('input',()=>{ $('tolVal').textContent=$('tolRange').value; });
 $('tolRange').addEventListener('change',reprocessImage);
+$('xeroxChk').addEventListener('change',reprocessImage);
 
 /* ----- rendu de l'aperçu principal ----- */
 function renderMain(){
