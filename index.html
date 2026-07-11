@@ -204,7 +204,7 @@
       </div>
 
       <div class="field" id="armContField" style="display:none">
-        <label class="check" style="margin:0"><input type="checkbox" id="armContChk"> Prolonger le print sur les bras (expérimental, en attente de calibration)</label>
+        <label class="check" style="margin:0"><input type="checkbox" id="armContChk" checked> Prolonger le print sur les bras (faces calibrées en jeu ✔)</label>
       </div>
 
       <div id="freeOpts" style="display:none">
@@ -310,6 +310,16 @@ function limbCross(x0){
 const LIMB_L = limbCross(19);
 const LIMB_R = limbCross(308);
 const LIMBS = [LIMB_L, LIMB_R];
+/* Cartographie CALIBRÉE en jeu (upload du template de calibration) :
+   - bras/jambe DROITS de l'avatar = croix GAUCHE du template :
+     AVANT en jeu = colonne 4 (clé 'back'), DOS en jeu = colonne 2 (clé 'front')
+   - bras/jambe GAUCHES = croix DROITE :
+     AVANT = colonne 1 (clé 'left'), DOS = colonne 3 (clé 'right') */
+const ARM_R_FRONT=LIMB_L.back,  ARM_R_BACK=LIMB_L.front;
+const ARM_L_FRONT=LIMB_R.left,  ARM_L_BACK=LIMB_R.right;
+const LEG_R_FRONT=LIMB_L.back,  LEG_L_FRONT=LIMB_R.left;
+const LEG_FRONTS=[LEG_R_FRONT, LEG_L_FRONT];
+const LIMB_SIDES=[LIMB_L.left, LIMB_L.right, LIMB_R.front, LIMB_R.back]; // côtés en jeu
 const PARTS = {torso: TORSO, limbL: LIMB_L, limbR: LIMB_R};
 const FACES = (()=>{
   const out=[];
@@ -1223,8 +1233,7 @@ function denimWash(ctx,rng,garmentKind){
   const tile=document.createElement('canvas'); tile.width=tile.height=256;
   tile.getContext('2d').putImageData(im,0,0);
   for(const z of ZONE_LIST) o.drawImage(tile,z.x,z.y,z.w*1.5,z.h); // étiré = plis de lavage
-  if(garmentKind==='pants') for(const limb of LIMBS){
-    const r=limb.front;
+  if(garmentKind==='pants') for(const r of LEG_FRONTS){
     const g=o.createRadialGradient(r.x+r.w/2,r.y+r.h*0.5,4,r.x+r.w/2,r.y+r.h*0.5,r.w*0.8);
     g.addColorStop(0,'rgba(255,255,255,0.38)'); g.addColorStop(1,'rgba(255,255,255,0)');
     o.fillStyle=g; o.fillRect(r.x,r.y,r.w,r.h);
@@ -1761,10 +1770,9 @@ const SHIRT_STYLES = {
       for(const f of SIDE_FACES) band(ctx,TORSO[f],'#0b0c10',9,true);
       ctx.fillStyle='#c9c9d2'; ctx.fillRect(cx-6,fr.y+fr.h-8,12,7);
       ctx.fillStyle='#0b0c10'; ctx.fillRect(cx-3,fr.y+fr.h-6.5,6,4);
-      // boutons de manche
+      // boutons de manche (avant des bras calibré)
       ctx.fillStyle='#c9c9d2';
-      for(const limb of LIMBS){
-        const r=limb.front;
+      for(const r of [ARM_R_FRONT,ARM_L_FRONT]){
         ctx.beginPath(); ctx.arc(r.x+r.w/2+14,r.y+r.h-10,1.8,0,7); ctx.arc(r.x+r.w/2+14,r.y+r.h-17,1.8,0,7); ctx.fill();
       }
     }},
@@ -1901,8 +1909,7 @@ const PANTS_STYLES = {
         ctx.strokeRect(px,bk.y+26,34,28);
         ctx.beginPath(); ctx.moveTo(px+4,bk.y+38); ctx.lineTo(px+17,bk.y+46); ctx.lineTo(px+30,bk.y+38); ctx.stroke();
       }
-      for(const limb of LIMBS) for(const f of ['left','right']){
-        const r=limb[f];
+      for(const r of LIMB_SIDES){
         ctx.beginPath(); ctx.moveTo(r.x+r.w/2,r.y); ctx.lineTo(r.x+r.w/2,r.y+r.h); ctx.stroke();
       }
       ctx.setLineDash([]); ctx.globalAlpha=1;
@@ -1917,8 +1924,7 @@ const PANTS_STYLES = {
       ctx.strokeStyle=p.light; ctx.lineWidth=3; ctx.lineCap='round';
       ctx.beginPath(); ctx.moveTo(cx-8,fr.y+12); ctx.lineTo(cx-10,fr.y+30); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(cx+8,fr.y+12); ctx.lineTo(cx+10,fr.y+30); ctx.stroke();
-      for(const limb of LIMBS) for(const f of ['left','right']){
-        const r=limb[f];
+      for(const r of LIMB_SIDES){
         ctx.fillStyle=p.accent; ctx.fillRect(r.x+r.w/2-8,r.y,6,r.h);
         ctx.fillRect(r.x+r.w/2+2,r.y,6,r.h);
       }
@@ -1930,8 +1936,8 @@ const PANTS_STYLES = {
       ctx.fillStyle=p.darker; const zt=ZONES.torso; ctx.fillRect(zt.x,2,zt.w,70);
       const fr=TORSO.front, cx=fr.x+fr.w/2;
       ctx.fillStyle=p.light; ctx.fillRect(cx-6,fr.y+2,12,8);
-      for(const limb of LIMBS) for(const f of ['left','right']){
-        const r=limb[f], px=r.x+8, py=r.y+26, pw=r.w-16, ph=40;
+      for(const r of LIMB_SIDES){
+        const px=r.x+8, py=r.y+26, pw=r.w-16, ph=40;
         ctx.fillStyle='rgba(0,0,0,0.18)'; ctx.fillRect(px,py,pw,ph);
         ctx.fillStyle=p.dark; ctx.fillRect(px,py,pw,10);
         ctx.fillStyle=p.light; ctx.beginPath(); ctx.arc(px+pw/2,py+7,2.5,0,7); ctx.fill();
@@ -1951,9 +1957,7 @@ const PANTS_STYLES = {
       ctx.beginPath(); ctx.moveTo(cx-8,fr.y+12); ctx.lineTo(cx-10,fr.y+28); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(cx+8,fr.y+12); ctx.lineTo(cx+10,fr.y+28); ctx.stroke();
       ctx.fillStyle=p.accent;
-      for(const limb of LIMBS) for(const f of ['left','right']){
-        const r=limb[f]; ctx.fillRect(r.x+r.w/2-4,r.y,8,54);
-      }
+      for(const r of LIMB_SIDES) ctx.fillRect(r.x+r.w/2-4,r.y,8,54);
     },
     after(ctx,p){
       const CUT=54, ly=LIMB_L.front.y;
@@ -1971,7 +1975,7 @@ const PANTS_STYLES = {
       ctx.fillStyle='#c9c9c9'; ctx.fillRect(cx-6,fr.y+1,12,7);
       ctx.fillStyle=p.darker; ctx.fillRect(cx-3,fr.y+2.5,6,4);
       ctx.fillStyle='rgba(255,255,255,0.12)';
-      for(const limb of LIMBS){ const r=limb.front; ctx.fillRect(r.x+r.w/2-1,r.y,2,r.h); }
+      for(const r of LEG_FRONTS) ctx.fillRect(r.x+r.w/2-1,r.y,2,r.h);
       const bk=TORSO.back;
       ctx.fillStyle='rgba(0,0,0,0.3)';
       ctx.fillRect(bk.x+18,bk.y+30,30,4); ctx.fillRect(bk.x+bk.w-48,bk.y+30,30,4);
@@ -2011,9 +2015,9 @@ const PANTS_STYLES = {
       ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=2;
       ctx.beginPath(); ctx.moveTo(fr.x+8,fr.y+16); ctx.quadraticCurveTo(fr.x+32,fr.y+24,fr.x+34,fr.y+52); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(fr.x+fr.w-8,fr.y+16); ctx.quadraticCurveTo(fr.x+fr.w-32,fr.y+24,fr.x+fr.w-34,fr.y+52); ctx.stroke();
-      // grandes poches plaquées sur les cuisses (ton sur ton)
-      if(rng()<0.55) for(const limb of LIMBS){
-        const r=limb.front, px=r.x+7, py=r.y+18, pw=r.w-14, ph=44;
+      // grandes poches plaquées sur l'avant des cuisses (faces calibrées)
+      if(rng()<0.55) for(const r of LEG_FRONTS){
+        const px=r.x+7, py=r.y+18, pw=r.w-14, ph=44;
         ctx.fillStyle='rgba(0,0,0,0.30)'; ctx.fillRect(px,py,pw,ph);
         ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(px,py,pw,2);
         ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1.5;
@@ -2048,7 +2052,7 @@ const PANTS_STYLES = {
       ctx.fillStyle='#101014'; ctx.fillRect(cx-3,fr.y+3,6,4);
       // pli de repassage lumineux
       ctx.fillStyle='rgba(255,255,255,0.14)';
-      for(const limb of LIMBS){ const r=limb.front; ctx.fillRect(r.x+r.w/2-1,r.y,2,r.h); }
+      for(const r of LEG_FRONTS) ctx.fillRect(r.x+r.w/2-1,r.y,2,r.h);
       // poches passepoilées
       const bk=TORSO.back;
       ctx.fillStyle='rgba(0,0,0,0.35)';
@@ -2072,8 +2076,8 @@ const PANTS_STYLES = {
       // chaîne sur la hanche
       const fr=TORSO.front;
       drawChain(ctx, fr.x+10, fr.y+16, fr.x+34, fr.y+52, '#b9b9c2', 7);
-      // effet skinny : côtés très sombres
-      for(const limb of LIMBS) for(const f of ['left','right']) band(ctx,limb[f],'rgba(0,0,0,0.28)',128,false);
+      // effet skinny : côtés très sombres (faces calibrées)
+      for(const r of LIMB_SIDES) band(ctx,r,'rgba(0,0,0,0.28)',128,false);
       // cœur brisé sur poche arrière
       drawHeart(ctx, TORSO.back.x+30, TORSO.back.y+40, 11, p.accent, true, p.base);
       for(const limb of LIMBS) for(const f of SIDE_FACES) band(ctx,limb[f],p.accent,4,true,0.9);
@@ -2090,9 +2094,9 @@ const PANTS_STYLES = {
         g.addColorStop(0,'rgba(255,255,255,0)'); g.addColorStop(1,'rgba(255,255,255,0.22)');
         ctx.fillStyle=g; ctx.fillRect(r.x,r.y+r.h*0.5,r.w,r.h*0.5);
       }
-      // papillon brodé + étoiles
-      drawButterfly(ctx, LIMB_L.front.x+LIMB_L.front.w/2, LIMB_L.front.y+42, 20, p.accent, p.text);
-      drawStar(ctx, LIMB_R.front.x+LIMB_R.front.w/2, LIMB_R.front.y+46, 13, p.accent);
+      // papillon brodé + étoiles sur l'avant des jambes (faces calibrées)
+      drawButterfly(ctx, LEG_R_FRONT.x+LEG_R_FRONT.w/2, LEG_R_FRONT.y+42, 20, p.accent, p.text);
+      drawStar(ctx, LEG_L_FRONT.x+LEG_L_FRONT.w/2, LEG_L_FRONT.y+46, 13, p.accent);
       scatterInFaces(ctx,rng,[TORSO.front,TORSO.back],5,(x,y,r2)=>drawSparkle(ctx,x,y,4+r2()*4,'#ffffff'));
       for(const limb of LIMBS) for(const f of SIDE_FACES) band(ctx,limb[f],p.accent,5,true,0.9);
     },
@@ -2109,9 +2113,8 @@ const PANTS_STYLES = {
     },
     after(ctx,p,rng,opts){
       if(!tornAllowed(opts)) return;
-      // accrocs patatoïdes : la peau apparaît entre les fils tendus
-      for(const limb of LIMBS){
-        const r=limb.front;
+      // accrocs patatoïdes sur l'AVANT des jambes (faces calibrées)
+      for(const r of LEG_FRONTS){
         const n=1+Math.floor(rng()*2);
         for(let i=0;i<n;i++)
           ripHole(ctx, r.x+r.w/2+(rng()-0.5)*10, r.y+28+rng()*72, 14+rng()*8, 5+rng()*4, rng);
@@ -2615,17 +2618,17 @@ function generateFromImage(kind, img, placement, baseHex, logoScale, shadows){
     if(kind==='shirt'){
       const sx=iw*0.26, sw=iw*0.48, sy=ih*0.04, sh=ih*0.92;
       crop(sx,sy,sw,sh, TORSO.front.x,TORSO.front.y,TORSO.front.w,TORSO.front.h);
-      // prolongement sur les bras : optionnel tant que la carte des faces
-      // des bras n'est pas calibrée en jeu
-      if($('armContChk') && $('armContChk').checked){
+      // prolongement sur les bras : faces AVANT calibrées en jeu
+      // (photo-gauche -> bras droit avatar, photo-droite -> bras gauche)
+      if(!$('armContChk') || $('armContChk').checked){
         const sideW=sw*0.5;
-        crop(sx-sideW, sy, sideW, sh, LIMB_L.front.x,LIMB_L.front.y,LIMB_L.front.w,LIMB_L.front.h);
-        crop(sx+sw,    sy, sideW, sh, LIMB_R.front.x,LIMB_R.front.y,LIMB_R.front.w,LIMB_R.front.h);
+        crop(sx-sideW, sy, sideW, sh, ARM_R_FRONT.x,ARM_R_FRONT.y,ARM_R_FRONT.w,ARM_R_FRONT.h);
+        crop(sx+sw,    sy, sideW, sh, ARM_L_FRONT.x,ARM_L_FRONT.y,ARM_L_FRONT.w,ARM_L_FRONT.h);
       }
     } else {
       crop(iw*0.12, ih*0.01, iw*0.76, ih*0.20, TORSO.front.x,TORSO.front.y,TORSO.front.w,TORSO.front.h);
-      crop(iw*0.08, ih*0.20, iw*0.38, ih*0.78, LIMB_L.front.x,LIMB_L.front.y,LIMB_L.front.w,LIMB_L.front.h);
-      crop(iw*0.54, ih*0.20, iw*0.38, ih*0.78, LIMB_R.front.x,LIMB_R.front.y,LIMB_R.front.w,LIMB_R.front.h);
+      crop(iw*0.08, ih*0.20, iw*0.38, ih*0.78, LEG_R_FRONT.x,LEG_R_FRONT.y,LEG_R_FRONT.w,LEG_R_FRONT.h);
+      crop(iw*0.54, ih*0.20, iw*0.38, ih*0.78, LEG_L_FRONT.x,LEG_L_FRONT.y,LEG_L_FRONT.w,LEG_L_FRONT.h);
     }
     // 3) ombrage volumique généré sur tout le vêtement (photo comprise)
     if(shadows){
@@ -2698,13 +2701,13 @@ function drawAvatar(cvAvatar, kind, garment, pair){
     }
     if(pantsCv){
       put(pantsCv, TORSO.front, cx-tw/2, topY, tw, th);
-      put(pantsCv, LIMB_L.front, cx-tw/2,    topY+th, aw, ah);
-      put(pantsCv, LIMB_R.front, cx-tw/2+aw, topY+th, aw, ah);
+      put(pantsCv, LEG_R_FRONT, cx-tw/2,    topY+th, aw, ah); // jambe droite = vue à gauche
+      put(pantsCv, LEG_L_FRONT, cx-tw/2+aw, topY+th, aw, ah);
     }
     if(shirtCv){
       put(shirtCv, TORSO.front,  cx-tw/2, topY, tw, th);
-      put(shirtCv, LIMB_L.front, cx-tw/2-aw, topY, aw, ah);
-      put(shirtCv, LIMB_R.front, cx+tw/2,    topY, aw, ah);
+      put(shirtCv, ARM_R_FRONT, cx-tw/2-aw, topY, aw, ah);    // bras droit = vue à gauche
+      put(shirtCv, ARM_L_FRONT, cx+tw/2,    topY, aw, ah);
     }
   }
   ctx.strokeStyle='rgba(0,0,0,0.35)'; ctx.lineWidth=1.5;
@@ -3132,10 +3135,15 @@ function renderMain(){
     ctx.strokeStyle='rgba(79,140,255,0.9)'; ctx.lineWidth=1;
     ctx.font='10px system-ui'; ctx.fillStyle='rgba(79,140,255,0.9)';
     ctx.textAlign='left'; ctx.textBaseline='top';
-    const lbl={up:'HAUT',down:'BAS',front:'AVANT',back:'DOS',left:'G',right:'D'};
-    for(const {face,r} of FACES){
+    // étiquettes calibrées en jeu (les croix de membres n'ont pas le même ordre que le torse)
+    const LBL={
+      torso:{up:'HAUT',down:'BAS',front:'AVANT',back:'DOS',left:'CÔTÉ',right:'CÔTÉ'},
+      limbL:{up:'HAUT',down:'BAS',front:'DOS',back:'AVANT',left:'CÔTÉ',right:'CÔTÉ'},
+      limbR:{up:'HAUT',down:'BAS',front:'CÔTÉ',back:'DOS',left:'AVANT',right:'CÔTÉ'},
+    };
+    for(const {part,face,r} of FACES){
       ctx.strokeRect(r.x+.5,r.y+.5,r.w-1,r.h-1);
-      ctx.fillText(lbl[face], r.x+3, r.y+3);
+      ctx.fillText(LBL[part][face], r.x+3, r.y+3);
     }
   }
   drawAvatar($('avatarCanvas'), current.kind, current.canvas, current.pair);
