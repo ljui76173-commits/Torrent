@@ -1693,6 +1693,28 @@ const SHIRT_STYLES = {
       ctx.fillStyle='rgba(255,255,255,0.11)';
       for(const z of ZONE_LIST) for(let x=z.x+4;x<z.x+z.w;x+=8) ctx.fillRect(x,z.y,1.2,z.h);
       const fr=TORSO.front, cx=fr.x+fr.w/2;
+      if(rng()<0.4){ // variante « tout noir » : V étroit, cravate rouge fine, liserés blancs
+        ctx.fillStyle='#0a0a0c';
+        ctx.beginPath(); ctx.moveTo(cx-11,fr.y); ctx.lineTo(cx,fr.y+52); ctx.lineTo(cx+11,fr.y); ctx.closePath(); ctx.fill();
+        ctx.fillStyle=pick(rng,['#6a1420','#5a1018','#24427a']);
+        ctx.beginPath();
+        ctx.moveTo(cx-3.5,fr.y); ctx.lineTo(cx+3.5,fr.y);
+        ctx.lineTo(cx+5,fr.y+44); ctx.lineTo(cx,fr.y+52); ctx.lineTo(cx-5,fr.y+44);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1.5;
+        ctx.beginPath(); ctx.moveTo(cx-11,fr.y); ctx.lineTo(cx,fr.y+52); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(cx+11,fr.y); ctx.lineTo(cx,fr.y+52); ctx.stroke();
+        for(const f of SIDE_FACES) band(ctx,TORSO[f],'#0b0c10',9,true);
+        ctx.fillStyle='#c9c9d2'; ctx.fillRect(cx-6,fr.y+fr.h-8,12,7);
+        ctx.fillStyle='#0b0c10'; ctx.fillRect(cx-3,fr.y+fr.h-6.5,6,4);
+        // liserés blancs aux poignets
+        for(const limb of LIMBS) for(const f of SIDE_FACES){
+          const r=limb[f];
+          ctx.fillStyle='#e8e8ee'; ctx.fillRect(r.x,r.y+r.h-7,r.w,3.5);
+          ctx.fillStyle='#0b0c10'; ctx.fillRect(r.x,r.y+r.h-3.5,r.w,3.5);
+        }
+        return;
+      }
       // chemise dans l'ouverture en V (plus large et plus profonde)
       const shirtCol=pick(rng,['#d9b64a','#e8e2d2','#b8ccd9']);
       ctx.fillStyle=shirtCol;
@@ -1740,6 +1762,76 @@ const SHIRT_STYLES = {
         const r=limb.front;
         ctx.beginPath(); ctx.arc(r.x+r.w/2+14,r.y+r.h-10,1.8,0,7); ctx.arc(r.x+r.w/2+14,r.y+r.h-17,1.8,0,7); ctx.fill();
       }
+    }},
+  cami: {label:'🖤 Caraco satin (Y2K emo)', fabric:'solid', skipFit:true, clothStrength:0.07,
+    palette:paletteFrom([['#571622','#141114'],['#471019','#141114'],['#2a1030','#141114'],['#151517','#571622']]),
+    paint(ctx,p,rng){
+      // satin froissé : plis horizontaux lumineux irréguliers
+      for(const f of SIDE_FACES){
+        const r=TORSO[f];
+        for(let i=0;i<7;i++){
+          const y=r.y+20+i*((r.h-24)/7)+(rng()-0.5)*7;
+          const g=ctx.createLinearGradient(0,y-4,0,y+5);
+          g.addColorStop(0,'rgba(255,255,255,0)');
+          g.addColorStop(0.5,`rgba(255,238,238,${0.09+rng()*0.09})`);
+          g.addColorStop(1,'rgba(0,0,0,0.12)');
+          ctx.fillStyle=g; ctx.fillRect(r.x,y-4,r.w,9);
+        }
+      }
+    },
+    after(ctx,p,rng,opts){
+      const NECK=14;
+      const fr=TORSO.front, cx=fr.x+fr.w/2;
+      // bras nus + épaules nues
+      for(const z of [ZONES.limbL,ZONES.limbR]) ctx.clearRect(z.x,z.y,z.w,z.h);
+      const zt=ZONES.torso;
+      ctx.clearRect(zt.x,2,zt.w,70);                         // dessus du torse
+      for(const f of SIDE_FACES){ const r=TORSO[f]; ctx.clearRect(r.x,r.y,r.w,NECK); }
+      // décolleté en V doux devant
+      ctx.save(); ctx.globalCompositeOperation='destination-out';
+      ctx.beginPath();
+      ctx.moveTo(cx-26,fr.y+NECK); ctx.quadraticCurveTo(cx,fr.y+NECK+16,cx+26,fr.y+NECK);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      // dentelle noire le long du bord (festons + picots)
+      const lace=(x0,x1,yEdge,dip)=>{
+        ctx.fillStyle='#131114'; ctx.strokeStyle='#131114';
+        for(let x=x0+3;x<x1-2;x+=6){
+          const t=(x-x0)/(x1-x0);
+          const y=yEdge+(dip? Math.sin(t*Math.PI)*13 : 0);
+          ctx.beginPath(); ctx.arc(x,y+1.5,3.2,0,Math.PI); ctx.fill();       // feston
+          ctx.fillRect(x-0.75,y-2.5,1.5,3);                                   // picot
+        }
+        ctx.lineWidth=2;
+        ctx.beginPath();
+        if(dip){ ctx.moveTo(x0,yEdge); ctx.quadraticCurveTo((x0+x1)/2,yEdge+dip,x1,yEdge); }
+        else { ctx.moveTo(x0,yEdge); ctx.lineTo(x1,yEdge); }
+        ctx.stroke();
+      };
+      for(const f of ['left','right','back']){ const r=TORSO[f]; lace(r.x,r.x+r.w,r.y+NECK,0); }
+      lace(fr.x,fr.x+fr.w,fr.y+NECK,17);
+      // fines bretelles
+      ctx.fillStyle='#131114';
+      for(const f of ['front','back']){
+        const r=TORSO[f];
+        ctx.fillRect(r.x+r.w*0.2-2.5, r.y, 5, NECK+3);
+        ctx.fillRect(r.x+r.w*0.8-2.5, r.y, 5, NECK+3);
+      }
+      // colliers rosaire : deux rangs + croix pendante
+      const bead=(x,y,r2)=>{ ctx.beginPath(); ctx.arc(x,y,r2,0,7); ctx.stroke(); };
+      ctx.strokeStyle='#c9c9d2'; ctx.lineWidth=1.4;
+      for(let i=0;i<=12;i++){
+        const t=i/12, x=fr.x+fr.w*0.16+t*fr.w*0.68;
+        bead(x, fr.y+NECK+4+Math.sin(t*Math.PI)*10, 2);
+      }
+      for(let i=0;i<=9;i++){
+        const t=i/9, x=fr.x+fr.w*0.26+t*fr.w*0.48;
+        bead(x, fr.y+NECK+2+Math.sin(t*Math.PI)*5, 1.7);
+      }
+      for(let i=0;i<5;i++) bead(cx, fr.y+NECK+15+i*4.5, 1.7);  // chute verticale
+      ctx.fillStyle='#d2d2da';                                  // croix
+      ctx.fillRect(cx-1.5, fr.y+NECK+36, 3, 14);
+      ctx.fillRect(cx-5.5, fr.y+NECK+40, 11, 3);
     }},
   street: {label:'🔥 Streetwear', fabric:'solid',
     palette(rng,forced){
@@ -1914,6 +2006,21 @@ const PANTS_STYLES = {
       ctx.strokeStyle='rgba(255,255,255,0.18)'; ctx.lineWidth=2;
       ctx.beginPath(); ctx.moveTo(fr.x+8,fr.y+16); ctx.quadraticCurveTo(fr.x+32,fr.y+24,fr.x+34,fr.y+52); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(fr.x+fr.w-8,fr.y+16); ctx.quadraticCurveTo(fr.x+fr.w-32,fr.y+24,fr.x+fr.w-34,fr.y+52); ctx.stroke();
+      // grandes poches plaquées sur les cuisses (ton sur ton)
+      if(rng()<0.55) for(const limb of LIMBS){
+        const r=limb.front, px=r.x+7, py=r.y+18, pw=r.w-14, ph=44;
+        ctx.fillStyle='rgba(0,0,0,0.30)'; ctx.fillRect(px,py,pw,ph);
+        ctx.fillStyle='rgba(255,255,255,0.07)'; ctx.fillRect(px,py,pw,2);
+        ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1.5;
+        ctx.strokeRect(px,py,pw,ph);
+      }
+      // chaîne à breloques sur la hanche
+      if(rng()<0.55){
+        drawChain(ctx, fr.x+10, fr.y+16, fr.x+36, fr.y+54, '#b8b8c2', 8);
+        ctx.fillStyle='#c9c9d2'; // petite croix pendante
+        ctx.fillRect(fr.x+34, fr.y+56, 2.5, 9);
+        ctx.fillRect(fr.x+31, fr.y+58.5, 8.5, 2.5);
+      }
       // revers roulé en bas de jambe
       for(const limb of LIMBS) for(const f of SIDE_FACES){
         const r=limb[f];
@@ -2239,6 +2346,14 @@ function generateTemplate(kind, opts){
     TORE=true;
   }
   if(!style.skipFit && !SKIP_FIT) applyFit(kind, opts.fit||'mixte', ctx, p);
+  // nettoie tout débordement hors des zones (halo du soften, traits d'accessoires)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0,0,TW,TH);
+  for(const z of ZONE_LIST) ctx.rect(z.x,z.y,z.w,z.h);
+  ctx.clip('evenodd');
+  ctx.clearRect(0,0,TW,TH);
+  ctx.restore();
   return {canvas:cv, styleKey, palette:p};
 }
 
@@ -2247,7 +2362,7 @@ const MATCH_PANTS={
   tee:'jean', hoodie:'jogging', varsity:'jean', jersey:'jogging',
   chemise:'costume', pull:'jean', emo:'emo', y2k:'y2k',
   kawaii:'kawaii', grunge:'grunge', street:'cargo',
-  metal:'baggy', costard:'costard',
+  metal:'baggy', costard:'costard', cami:'baggy',
 };
 
 function generateTShirt(opts){
@@ -2957,26 +3072,36 @@ function renderMain(){
 }
 $('guideChk').addEventListener('change',renderMain);
 
-/* ----- Noms d'items prêts pour le catalogue ----- */
-const NAME_WORDS={
-  emo:['void','sorrow','hex','nocturne','broken','fallen'],
-  y2k:['y2k','stardust','angel','retro','2000s','cyber'],
-  kawaii:['kawaii','mochi','sweetie','pastel','bunny','cutie'],
-  grunge:['grunge','riot','90s','wasted','faded','misery'],
-  street:['street','drip','urban','og','hype','wavy'],
-  metal:['metal','doom','abyss','requiem','occult'],
-  costard:['old money','tailored','heir','riviera','gentleman'],
-  baggy:['baggy','satin','midnight','wide'],
-  jean:['denim','classic','vintage'], jogging:['cozy','sporty','chill'],
-  hoodie:['cozy','oversized','soft'], jersey:['team','pro','mvp'],
-  default:['classic','essential','og','daily','core'],
+/* ----- Noms d'items façon catalogue (salade de mots-clés SEO) ----- */
+const NAME_INTROS=['Évasion','Archive','Relique','Vision','Rêverie','Essence','Fragment','Aura'];
+const NAME_ADJS=['subversive','gothique','céleste','maudite','rétro','éthérée','vintage','sombre','divine'];
+const NAME_TAGS={
+  emo:['emo','vampire','gothique','scene','sombre'],
+  y2k:['y2k','gyaru','2000s','cyber','stardust'],
+  kawaii:['kawaii','gyaru','coquette','pastel','mignon'],
+  grunge:['grunge','90s','fairy grunge','punk','délavé'],
+  street:['streetwear','urbain','og','drip','oversize'],
+  metal:['metal','rock','cuir','opium','dark'],
+  cami:['y2k','emo','vampire','satin','dentelle','coquette'],
+  costard:['old money','mafia','élégant','riche','classe'],
+  baggy:['baggy','satin','skater','opium','large'],
+  jean:['denim','vintage','délavé'], jogging:['cozy','sport','chill'],
+  hoodie:['cozy','oversize','soft'], jersey:['sport','rétro','vintage'],
+  chemise:['preppy','old money','classe'], varsity:['college','rétro','américain'],
+  default:['aesthetic','classique','og'],
 };
+const NAME_ENDS=['mignon','aesthetic','fairycore','coquette','grunge','vintage','opium','core','doux'];
 function itemTitle(kind,styleKey,seed){
   const r=mulberry32((seed||0)+13);
-  const bank=NAME_WORDS[styleKey]||NAME_WORDS.default;
-  const deco=pick(r,['✦','★','†','~','ʚɞ','﹆']);
-  const kindName={tshirt:'tee',shirt:'shirt',pants:'pants'}[kind]||kind;
-  return `${deco} ${pick(r,bank)} ${styleKey} ${kindName} ${deco}`;
+  const tags=(NAME_TAGS[styleKey]||NAME_TAGS.default).slice();
+  const kindName={tshirt:'tee-shirt',shirt:'haut',pants:'pantalon'}[kind]||kind;
+  const t1=tags.splice(Math.floor(r()*tags.length),1)[0];
+  const t2=tags.length?tags.splice(Math.floor(r()*tags.length),1)[0]:'';
+  const t3=tags.length?tags[Math.floor(r()*tags.length)]:'';
+  // ex : « Évasion subversive de l'archive y2k gyaru de vampire rétro mignon »
+  return `${pick(r,NAME_INTROS)} ${pick(r,NAME_ADJS)} ${kindName} ${t1} ${t2} de ${t3} ${pick(r,NAME_ADJS)} ${pick(r,NAME_ENDS)}`
+    .replace(/\bde ([aeéiouy])/gi,"d'$1")
+    .replace(/\s+/g,' ').trim();
 }
 
 /* ----- Galerie persistante (localStorage) ----- */
