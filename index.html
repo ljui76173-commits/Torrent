@@ -51,7 +51,12 @@
   .gallery{display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:12px; margin-top:14px;}
   .card{background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:10px; text-align:center;}
   .card canvas{width:100%; border-radius:6px; background:repeating-conic-gradient(#23262e 0% 25%, #191c22 0% 50%) 0 0/14px 14px;}
-  .card .name{font-size:.72rem; color:var(--muted); margin:7px 0; word-break:break-all;}
+  .card .name{font-size:.72rem; color:var(--muted); margin:5px 0 2px; word-break:break-all;}
+  .card .title{font-size:.78rem; color:var(--text); margin:2px 0 7px; cursor:pointer;}
+  .card .title:hover{color:var(--accent);}
+  .card .row2{display:flex; gap:6px; justify-content:center;}
+  .card button.fav{background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:6px 9px; cursor:pointer; font-size:.8rem;}
+  .card button.fav.on{background:#4a3b12; border-color:#c9a227;}
   .hint{font-size:.75rem; color:var(--muted); line-height:1.5; margin-top:10px;}
   .hint b{color:var(--text);}
   input[type=range]{width:100%; accent-color:var(--accent);}
@@ -139,6 +144,7 @@
 
       <button class="btn" id="genBtn">✨ Générer</button>
       <button class="btn ghost" id="setBtn" style="margin-top:8px">🧥+👖 Générer un ensemble assorti</button>
+      <button class="btn ghost" id="collBtn" style="margin-top:8px">🏪 Collection (6 ensembles)</button>
     </div>
 
     <!-- ----- MODE IMAGE ----- -->
@@ -2244,6 +2250,7 @@ function refreshTypeUI(){
   $('chestTextField').style.display = curType==='tshirt' ? '' : 'none';
   $('fitField').style.display = curType==='tshirt' ? 'none' : '';
   $('setBtn').style.display = curType==='tshirt' ? 'none' : '';
+  $('collBtn').style.display = curType==='tshirt' ? 'none' : '';
   $('mainCap').textContent = curType==='tshirt' ? 'Image T-Shirt 512×512' : 'Template 585×559';
   refreshStyleSel();
 }
@@ -2473,7 +2480,39 @@ function renderMain(){
 }
 $('guideChk').addEventListener('change',renderMain);
 
-function addToGallery(item){
+/* ----- Noms d'items prêts pour le catalogue ----- */
+const NAME_WORDS={
+  emo:['void','sorrow','hex','nocturne','broken','fallen'],
+  y2k:['y2k','stardust','angel','retro','2000s','cyber'],
+  kawaii:['kawaii','mochi','sweetie','pastel','bunny','cutie'],
+  grunge:['grunge','riot','90s','wasted','faded','misery'],
+  street:['street','drip','urban','og','hype','wavy'],
+  jean:['denim','classic','vintage'], jogging:['cozy','sporty','chill'],
+  hoodie:['cozy','oversized','soft'], jersey:['team','pro','mvp'],
+  default:['classic','essential','og','daily','core'],
+};
+function itemTitle(kind,styleKey,seed){
+  const r=mulberry32((seed||0)+13);
+  const bank=NAME_WORDS[styleKey]||NAME_WORDS.default;
+  const deco=pick(r,['✦','★','†','~','ʚɞ','﹆']);
+  const kindName={tshirt:'tee',shirt:'shirt',pants:'pants'}[kind]||kind;
+  return `${deco} ${pick(r,bank)} ${styleKey} ${kindName} ${deco}`;
+}
+
+/* ----- Galerie persistante (localStorage) ----- */
+function saveGallery(){
+  try{
+    const recs=[];
+    for(const it of gallery){
+      if(!it.rec || it.rec._skip) continue;
+      recs.push(it.rec);
+      if(recs.length>=60) break;
+    }
+    localStorage.setItem('rcm_gallery', JSON.stringify(recs));
+  }catch(e){/* stockage indisponible : galerie de session uniquement */}
+}
+
+function addToGallery(item, skipSave){
   gallery.unshift(item);
   const card=document.createElement('div'); card.className='card';
   const th=document.createElement('canvas');
@@ -2483,12 +2522,40 @@ function addToGallery(item){
   th.style.cursor='pointer';
   th.title='Cliquer pour afficher en grand';
   th.addEventListener('click',()=>{current=item; renderMain();});
+  const ti=document.createElement('div'); ti.className='title';
+  ti.textContent=item.title||'';
+  ti.title='Cliquer pour copier le nom';
+  ti.addEventListener('click',()=>{
+    if(navigator.clipboard) navigator.clipboard.writeText(item.title);
+    ti.textContent='📋 copié !';
+    setTimeout(()=>ti.textContent=item.title,900);
+  });
   const nm=document.createElement('div'); nm.className='name'; nm.textContent=item.name;
+  const row=document.createElement('div'); row.className='row2';
   const dl=document.createElement('button'); dl.className='btn small green'; dl.textContent='⬇️ PNG';
   dl.addEventListener('click',()=>downloadCanvas(item.canvas,item.name));
-  card.append(th,nm,dl);
+  const fav=document.createElement('button'); fav.className='fav'+(item.rec&&item.rec.fav?' on':''); fav.textContent='⭐';
+  fav.title='Favori';
+  fav.addEventListener('click',()=>{
+    if(!item.rec) return;
+    item.rec.fav=!item.rec.fav;
+    fav.classList.toggle('on', !!item.rec.fav);
+    saveGallery();
+  });
+  const del=document.createElement('button'); del.className='fav'; del.textContent='🗑️';
+  del.title='Supprimer';
+  del.addEventListener('click',()=>{
+    const i=gallery.indexOf(item);
+    if(i>=0) gallery.splice(i,1);
+    card.remove();
+    $('galCount').textContent=gallery.length?`(${gallery.length})`:'';
+    saveGallery();
+  });
+  row.append(dl,fav,del);
+  card.append(th,ti,nm,row);
   $('gallery').prepend(card);
   $('galCount').textContent=`(${gallery.length})`;
+  if(!skipSave) saveGallery();
 }
 
 function downloadCanvas(cv,name){
@@ -2497,6 +2564,40 @@ function downloadCanvas(cv,name){
     a.href=URL.createObjectURL(b); a.download=name; a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),4000);
   },'image/png');
+}
+
+/* ----- fabriques d'items (utilisées par les boutons ET la restauration) ----- */
+function makeAutoItem(kind, opts){
+  const g = kind==='tshirt' ? generateTShirt(opts) : generateTemplate(kind,opts);
+  return {
+    canvas:g.canvas, kind, seed:opts.seed,
+    name:`${kind}-${g.styleKey}-${opts.seed}.png`,
+    title:itemTitle(kind,g.styleKey,opts.seed),
+    rec:{t:'auto', kind, style:g.styleKey, pattern:opts.pattern, fit:opts.fit,
+         text:opts.text||'', forcedColor:opts.forcedColor||null, seed:opts.seed},
+  };
+}
+function makeSetItems(shirtStyle, pattern, fit, forcedColor, seed){
+  const gs=generateTemplate('shirt',{style:shirtStyle, pattern, fit, seed, forcedColor, text:''});
+  const pStyle=MATCH_PANTS[gs.styleKey]||'jean';
+  const gp=generateTemplate('pants',{style:pStyle, pattern:'auto', fit, seed:seed+7, palette:gs.palette});
+  const shirtItem={canvas:gs.canvas, kind:'shirt', seed,
+    name:`shirt-${gs.styleKey}-ensemble-${seed}.png`,
+    title:itemTitle('shirt',gs.styleKey,seed),
+    rec:{t:'set', style:gs.styleKey, pattern, fit, forcedColor:forcedColor||null, seed}};
+  const pantsItem={canvas:gp.canvas, kind:'pants', seed:seed+7,
+    name:`pants-${gp.styleKey}-ensemble-${seed}.png`,
+    title:itemTitle('pants',gp.styleKey,seed),
+    rec:{_skip:true}}; // le record 'set' du shirt restaure les deux
+  shirtItem.pair=pantsItem; pantsItem.pair=shirtItem;
+  return [shirtItem, pantsItem];
+}
+function addSet(shirtStyle, pattern, fit, forcedColor, seed, skipSave, fav){
+  const [s,p]=makeSetItems(shirtStyle,pattern,fit,forcedColor,seed);
+  if(fav) s.rec.fav=true;
+  addToGallery(p,true);
+  addToGallery(s,skipSave);
+  return s;
 }
 
 /* ----- génération auto ----- */
@@ -2511,11 +2612,7 @@ $('genBtn').addEventListener('click',()=>{
     forcedColor:forced,
   };
   for(let i=0;i<n;i++){
-    const seed=Math.floor(Math.random()*1e9);
-    const opts={...opts0, seed};
-    const g = curType==='tshirt' ? generateTShirt(opts) : generateTemplate(curType,opts);
-    const item={canvas:g.canvas, kind:curType, seed,
-      name:`${curType}-${g.styleKey}-${seed}.png`};
+    const item=makeAutoItem(curType, {...opts0, seed:Math.floor(Math.random()*1e9)});
     addToGallery(item);
     if(i===0){ current=item; renderMain(); }
   }
@@ -2524,18 +2621,21 @@ $('genBtn').addEventListener('click',()=>{
 /* ----- ensemble assorti (shirt + pants, même palette) ----- */
 $('setBtn').addEventListener('click',()=>{
   const forced = $('randColor').checked ? null : $('baseColor').value;
-  const fit=$('fitSel').value;
-  const seed=Math.floor(Math.random()*1e9);
   const shirtStyle = curType==='shirt' ? $('styleSel').value : 'random';
-  const gs=generateTemplate('shirt',{style:shirtStyle, pattern:$('patternSel').value, fit, seed, forcedColor:forced, text:''});
-  const pStyle=MATCH_PANTS[gs.styleKey]||'jean';
-  const gp=generateTemplate('pants',{style:pStyle, pattern:'auto', fit, seed:seed+7, palette:gs.palette});
-  const shirtItem={canvas:gs.canvas, kind:'shirt', seed, name:`shirt-${gs.styleKey}-ensemble-${seed}.png`};
-  const pantsItem={canvas:gp.canvas, kind:'pants', seed:seed+7, name:`pants-${gp.styleKey}-ensemble-${seed}.png`};
-  shirtItem.pair=pantsItem; pantsItem.pair=shirtItem;
-  addToGallery(pantsItem);
-  addToGallery(shirtItem);
-  current=shirtItem; renderMain();
+  current=addSet(shirtStyle, $('patternSel').value, $('fitSel').value, forced, Math.floor(Math.random()*1e9));
+  renderMain();
+});
+
+/* ----- collection : 6 ensembles déclinés ----- */
+$('collBtn').addEventListener('click',()=>{
+  const forced = $('randColor').checked ? null : $('baseColor').value;
+  const shirtStyle = curType==='shirt' ? $('styleSel').value : 'random';
+  let first=null;
+  for(let i=0;i<6;i++){
+    const s=addSet(shirtStyle, $('patternSel').value, $('fitSel').value, forced, Math.floor(Math.random()*1e9));
+    if(!first) first=s;
+  }
+  current=first; renderMain();
 });
 
 /* ----- génération depuis image ----- */
@@ -2578,10 +2678,30 @@ $('zipBtn').addEventListener('click',async()=>{
 });
 $('clearBtn').addEventListener('click',()=>{
   gallery.length=0; $('gallery').innerHTML=''; $('galCount').textContent='';
+  saveGallery();
 });
+
+/* ----- restauration de la galerie sauvegardée ----- */
+function loadGallery(){
+  let recs=[];
+  try{ recs=JSON.parse(localStorage.getItem('rcm_gallery')||'[]'); }catch(e){ return; }
+  for(const r of recs.reverse()){
+    try{
+      if(r.t==='auto'){
+        const it=makeAutoItem(r.kind,{style:r.style, pattern:r.pattern||'auto', fit:r.fit||'mixte',
+          text:r.text||'', forcedColor:r.forcedColor||null, seed:r.seed});
+        it.rec.fav=r.fav;
+        addToGallery(it,true);
+      } else if(r.t==='set'){
+        addSet(r.style, r.pattern||'auto', r.fit||'mixte', r.forcedColor||null, r.seed, true, r.fav);
+      }
+    }catch(e){/* record corrompu : on l'ignore */}
+  }
+}
 
 /* ----- premier rendu ----- */
 refreshTypeUI();
+loadGallery();
 (function(){
   const seed=Math.floor(Math.random()*1e9);
   const g=generateTShirt({seed, style:'random', pattern:'auto', text:'', forcedColor:null});

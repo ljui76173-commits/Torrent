@@ -19,6 +19,12 @@ trame textile pixel par pixel (toile / maille / sergé denim + délavage), écla
 volumique par face, coutures, prints érodés façon sérigraphie usée, grain photo,
 palettes désaturées relevées dans le catalogue — plus d'aplats vectoriels.
 
+### Galerie persistante & collections 🏪
+La galerie survit au rechargement (les recettes de génération sont sauvegardées et
+rejouées), avec favoris ⭐, suppression à l'unité, et un **nom d'item prêt à coller**
+dans le catalogue sur chaque carte (clic = copié). Le bouton **Collection** génère
+6 ensembles déclinés d'un même style d'un coup.
+
 ### Ensembles assortis 🧥+👖
 Un bouton génère le **shirt et le pants coordonnés** (même palette, styles appariés :
 hoodie→jogging, emo→emo skinny, chemise→costume…) et l'aperçu avatar porte les deux.
