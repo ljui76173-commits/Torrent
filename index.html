@@ -195,6 +195,7 @@
         <select id="placementSel">
           <option value="logo" selected>Logo sur la poitrine</option>
           <option value="logoback">Logo devant + dos</option>
+          <option value="photofront">🧥 Photo de vêtement à plat (auto-découpe)</option>
           <option value="libre">🎯 Placement libre (glisser-déposer)</option>
           <option value="tile">Motif répété (tissu imprimé)</option>
           <option value="faces">Image continue sur chaque partie</option>
@@ -2563,6 +2564,36 @@ function generateFromImage(kind, img, placement, baseHex, logoScale, shadows){
   if(placement==='whole'){
     ctx.drawImage(img,0,0,TW,TH);
     doShade();
+  } else if(placement==='photofront'){
+    // photo de vêtement à plat : torse au centre, manches/jambes sur les côtés
+    const iw=img.width, ih=img.height;
+    const crop=(sx,sy,sw,sh,dx,dy,dw,dh)=>ctx.drawImage(img, sx,sy,Math.max(1,sw),Math.max(1,sh), dx,dy,dw,dh);
+    if(kind==='shirt'){
+      const zt=ZONES.torso;
+      // torse : bande centrale de la photo étirée sur toute la zone (gouttières comprises)
+      crop(iw*0.26, ih*0.02, iw*0.48, ih*0.96, zt.x, zt.y, zt.w, zt.h);
+      // faces avant/dos redessinées proprement
+      crop(iw*0.27, ih*0.05, iw*0.46, ih*0.90, TORSO.front.x, TORSO.front.y, TORSO.front.w, TORSO.front.h);
+      crop(iw*0.27, ih*0.05, iw*0.46, ih*0.90, TORSO.back.x, TORSO.back.y, TORSO.back.w, TORSO.back.h);
+      ctx.fillStyle='rgba(0,0,0,0.14)';
+      ctx.fillRect(TORSO.back.x, TORSO.back.y, TORSO.back.w, TORSO.back.h);
+      // manches : côtés de la photo vers chaque croix de bras
+      crop(0,        ih*0.06, iw*0.25, ih*0.86, ZONES.limbL.x, ZONES.limbL.y, ZONES.limbL.w, ZONES.limbL.h);
+      crop(iw*0.75,  ih*0.06, iw*0.25, ih*0.86, ZONES.limbR.x, ZONES.limbR.y, ZONES.limbR.w, ZONES.limbR.h);
+      crop(iw*0.02,  ih*0.08, iw*0.21, ih*0.82, LIMB_L.front.x, LIMB_L.front.y, LIMB_L.front.w, LIMB_L.front.h);
+      crop(iw*0.77,  ih*0.08, iw*0.21, ih*0.82, LIMB_R.front.x, LIMB_R.front.y, LIMB_R.front.w, LIMB_R.front.h);
+    } else {
+      // pants : jambe gauche / jambe droite de la photo, taille en haut
+      const zt=ZONES.torso;
+      crop(iw*0.08, 0, iw*0.84, ih*0.24, zt.x, zt.y, zt.w, zt.h);
+      crop(iw*0.12, ih*0.02, iw*0.76, ih*0.20, TORSO.front.x, TORSO.front.y, TORSO.front.w, TORSO.front.h);
+      crop(iw*0.12, ih*0.02, iw*0.76, ih*0.20, TORSO.back.x, TORSO.back.y, TORSO.back.w, TORSO.back.h);
+      crop(iw*0.05, ih*0.20, iw*0.44, ih*0.78, ZONES.limbL.x, ZONES.limbL.y, ZONES.limbL.w, ZONES.limbL.h);
+      crop(iw*0.51, ih*0.20, iw*0.44, ih*0.78, ZONES.limbR.x, ZONES.limbR.y, ZONES.limbR.w, ZONES.limbR.h);
+      crop(iw*0.08, ih*0.22, iw*0.38, ih*0.74, LIMB_L.front.x, LIMB_L.front.y, LIMB_L.front.w, LIMB_L.front.h);
+      crop(iw*0.54, ih*0.22, iw*0.38, ih*0.74, LIMB_R.front.x, LIMB_R.front.y, LIMB_R.front.w, LIMB_R.front.h);
+    }
+    if(shadows) edgeAO(ctx); // la photo a déjà son propre éclairage
   } else if(placement==='faces'){
     // image continue par partie du corps (torse entier, chaque bras/jambe)
     for(const z of ZONE_LIST) drawCover(ctx,img,z.x,z.y,z.w,z.h);
@@ -3260,9 +3291,15 @@ $('genImgBtn').addEventListener('click',()=>{
     renderFree();
     return;
   }
-  const img=curImg();
+  let img=curImg();
   if(!img){ dz.style.borderColor='var(--danger)'; setTimeout(()=>dz.style.borderColor='',900); return; }
-  const g=generateFromImage(curType, img, $('placementSel').value, $('logoBase').value, parseInt($('logoScale').value,10), $('shadowChk').checked);
+  const placement=$('placementSel').value;
+  if(placement==='photofront' && IMG_LIB[selLib]){
+    // photo de vêtement : détourage doux pour ne pas manger les tissus clairs
+    img=preprocessImage(IMG_LIB[selLib].raw, $('removeBgChk').checked,
+      Math.min(parseInt($('tolRange').value,10), 13));
+  }
+  const g=generateFromImage(curType, img, placement, $('logoBase').value, parseInt($('logoScale').value,10), $('shadowChk').checked);
   const item={canvas:g.canvas, kind:curType, seed:null,
     name:`${curType}-image-${Date.now()%1e6}.png`};
   addToGallery(item);
