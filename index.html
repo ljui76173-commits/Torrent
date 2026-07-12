@@ -223,6 +223,7 @@
           <button class="btn small ghost" id="stkDupBtn">📄 Dupliquer</button>
           <button class="btn small ghost" id="stkDelBtn">🗑️ Supprimer</button>
         </div>
+        <label class="check"><input type="checkbox" id="blendChk" checked> Fondre les calques dans le tissu (ils prennent l'ombrage du vêtement)</label>
         <div class="hint" style="margin:0 0 10px">🎯 <b>Glisse les calques directement sur l'aperçu.</b> Le design affiché sert de fond : génère d'abord un style en mode auto, reviens ici, et empile tes images dessus.</div>
       </div>
 
@@ -260,6 +261,7 @@
       </div>
       <div class="toolbar">
         <button class="btn small green" id="dlBtn">⬇️ Télécharger le PNG</button>
+        <button class="btn small ghost" id="layersBtn">🖌️ Ajouter des images (calques)</button>
         <label class="check" style="margin:0"><input type="checkbox" id="guideChk"> Afficher les repères du template</label>
         <span class="badge" id="seedBadge"></span>
       </div>
@@ -2543,6 +2545,52 @@ function preprocessImage(img, removeBg, tolerance){
   return cropToContent(removeBackground(c, tolerance));
 }
 
+/* Détecte la silhouette d'un vêtement à plat : boîte englobante, largeur du
+   corps (colonnes atteignant l'ourlet), plage verticale des manches. */
+function detectGarment(img){
+  const W=Math.max(2,Math.min(360,img.width)), H=Math.max(2,Math.min(360,img.height));
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const x=c.getContext('2d'); x.drawImage(img,0,0,W,H);
+  const d=x.getImageData(0,0,W,H).data;
+  // couleur de fond = moyenne des 4 coins
+  const cor=[[1,1],[W-2,1],[1,H-2],[W-2,H-2]].map(([px,py])=>{const i=(py*W+px)*4;return [d[i],d[i+1],d[i+2],d[i+3]];});
+  const isGarment=i=>{
+    if(d[i*4+3]<40) return false;                 // transparent = fond
+    const r=d[i*4],g=d[i*4+1],b=d[i*4+2];
+    for(const [cr,cg,cb,ca] of cor){
+      if(ca<40) continue;
+      const dr=r-cr,dg=g-cg,db=b-cb;
+      if(dr*dr+dg*dg+db*db < 900) return false;    // proche d'un coin = fond
+    }
+    return true;
+  };
+  const rowL=new Int16Array(H), rowR=new Int16Array(H);
+  let x0=W,x1=0,y0=H,y1=0,any=false;
+  for(let y=0;y<H;y++){
+    let l=-1,r=-1;
+    for(let xx=0;xx<W;xx++){ if(isGarment(y*W+xx)){ if(l<0)l=xx; r=xx; } }
+    rowL[y]=l; rowR[y]=r;
+    if(l>=0){ any=true; if(l<x0)x0=l; if(r>x1)x1=r; if(y<y0)y0=y; if(y>y1)y1=y; }
+  }
+  if(!any || x1-x0<8 || y1-y0<8) return null;
+  // corps : extent horizontal médian dans le tiers bas (l'ourlet, sans manches)
+  const ls=[],rs=[];
+  for(let y=Math.floor(y0+(y1-y0)*0.7); y<=y1; y++){ if(rowL[y]>=0){ ls.push(rowL[y]); rs.push(rowR[y]); } }
+  ls.sort((a,b)=>a-b); rs.sort((a,b)=>a-b);
+  let bx0 = ls.length? ls[ls.length>>1] : x0;
+  let bx1 = rs.length? rs[rs.length>>1] : x1;
+  if(bx1-bx0 < (x1-x0)*0.35){ bx0=x0+(x1-x0)*0.28; bx1=x1-(x1-x0)*0.28; } // garde-fou
+  const sc=img.width/W, scY=img.height/H;
+  const sleeveMargin=(x1-x0)*0.06;
+  const hasSleeves = (bx0-x0 > sleeveMargin) && (x1-bx1 > sleeveMargin);
+  // plage verticale des manches : bande haute (épaules) du vêtement
+  const sy0=y0+(y1-y0)*0.08, sy1=y0+(y1-y0)*0.62;
+  return {
+    x0:x0*sc, x1:x1*sc, y0:y0*scY, y1:y1*scY,
+    bx0:bx0*sc, bx1:bx1*sc, hasSleeves,
+    sleeveY0:sy0*scY, sleeveY1:sy1*scY,
+  };
+}
 function generateFromImage(kind, img, placement, baseHex, logoScale, shadows){
   const rng=mulberry32(Math.floor(Math.random()*1e9));
   if(kind==='tshirt'){
@@ -2614,21 +2662,34 @@ function generateFromImage(kind, img, placement, baseHex, logoScale, shadows){
     const tileDest=Math.max(24, patch.srcSz*2*frontScale);
     for(let ty=0;ty<TH;ty+=tileDest) for(let tx=0;tx<TW;tx+=tileDest)
       ctx.drawImage(patch.tile, tx, ty, tileDest, tileDest);
-    // 2) print sur le devant uniquement
+    // 2) print sur le devant — auto-détection de la silhouette du vêtement
+    const det=detectGarment(img);
     if(kind==='shirt'){
-      const sx=iw*0.26, sw=iw*0.48, sy=ih*0.04, sh=ih*0.92;
+      let sx,sw,sy,sh;
+      if(det){
+        // corps = colonnes présentes jusqu'au bas (les manches ne descendent pas à l'ourlet)
+        sx=det.bx0; sw=det.bx1-det.bx0; sy=det.y0; sh=det.y1-det.y0;
+      } else { sx=iw*0.26; sw=iw*0.48; sy=ih*0.04; sh=ih*0.92; }
       crop(sx,sy,sw,sh, TORSO.front.x,TORSO.front.y,TORSO.front.w,TORSO.front.h);
-      // prolongement sur les bras : faces AVANT calibrées en jeu
-      // (photo-gauche -> bras droit avatar, photo-droite -> bras gauche)
+      // manches : soit les ailes détectées, soit la tranche adjacente à échelle égale
       if(!$('armContChk') || $('armContChk').checked){
-        const sideW=sw*0.5;
-        crop(sx-sideW, sy, sideW, sh, ARM_R_FRONT.x,ARM_R_FRONT.y,ARM_R_FRONT.w,ARM_R_FRONT.h);
-        crop(sx+sw,    sy, sideW, sh, ARM_L_FRONT.x,ARM_L_FRONT.y,ARM_L_FRONT.w,ARM_L_FRONT.h);
+        let rSx,rSw,lSx,lSw;
+        if(det && det.hasSleeves){
+          rSx=det.x0;      rSw=Math.max(1,det.bx0-det.x0);   // aile gauche photo -> bras droit avatar
+          lSx=det.bx1;     lSw=Math.max(1,det.x1-det.bx1);   // aile droite photo -> bras gauche avatar
+        } else {
+          const sideW=sw*0.5; rSx=sx-sideW; rSw=sideW; lSx=sx+sw; lSw=sideW;
+        }
+        const sSy = det? det.sleeveY0 : sy, sSh = det? det.sleeveY1-det.sleeveY0 : sh;
+        crop(rSx,sSy,rSw,sSh, ARM_R_FRONT.x,ARM_R_FRONT.y,ARM_R_FRONT.w,ARM_R_FRONT.h);
+        crop(lSx,sSy,lSw,sSh, ARM_L_FRONT.x,ARM_L_FRONT.y,ARM_L_FRONT.w,ARM_L_FRONT.h);
       }
     } else {
-      crop(iw*0.12, ih*0.01, iw*0.76, ih*0.20, TORSO.front.x,TORSO.front.y,TORSO.front.w,TORSO.front.h);
-      crop(iw*0.08, ih*0.20, iw*0.38, ih*0.78, LEG_R_FRONT.x,LEG_R_FRONT.y,LEG_R_FRONT.w,LEG_R_FRONT.h);
-      crop(iw*0.54, ih*0.20, iw*0.38, ih*0.78, LEG_L_FRONT.x,LEG_L_FRONT.y,LEG_L_FRONT.w,LEG_L_FRONT.h);
+      const gx0=det?det.x0:iw*0.1, gx1=det?det.x1:iw*0.9, gy0=det?det.y0:0, gy1=det?det.y1:ih;
+      const gw=gx1-gx0, gh=gy1-gy0, mid=gx0+gw/2;
+      crop(gx0, gy0, gw, gh*0.24, TORSO.front.x,TORSO.front.y,TORSO.front.w,TORSO.front.h); // taille
+      crop(gx0, gy0+gh*0.20, gw*0.5, gh*0.80, LEG_R_FRONT.x,LEG_R_FRONT.y,LEG_R_FRONT.w,LEG_R_FRONT.h);
+      crop(mid,  gy0+gh*0.20, gw*0.5, gh*0.80, LEG_L_FRONT.x,LEG_L_FRONT.y,LEG_L_FRONT.w,LEG_L_FRONT.h);
     }
     // 3) ombrage volumique généré sur tout le vêtement (photo comprise)
     if(shadows){
@@ -2843,23 +2904,39 @@ function stickerDims(s){
   const w=s.w, h=s.w*(s.img.height/s.img.width);
   return {w,h};
 }
-function bakeFree(withOutline){
-  const isT=curType==='tshirt';
-  const c=document.createElement('canvas');
-  c.width=isT?512:TW; c.height=isT?512:TH;
-  const x=c.getContext('2d');
-  x.drawImage(freeBase,0,0);
+function paintStickers(x,isT,withShadow){
   x.save();
   if(!isT) clipToZones(x);
   for(const s of stickers){
     const {w,h}=stickerDims(s);
     x.save();
     x.translate(s.x,s.y); x.rotate(s.rot*Math.PI/180);
-    x.shadowColor='rgba(0,0,0,0.45)'; x.shadowBlur=8; x.shadowOffsetY=4;
+    if(withShadow){ x.shadowColor='rgba(0,0,0,0.45)'; x.shadowBlur=8; x.shadowOffsetY=4; }
     x.drawImage(s.img,-w/2,-h/2,w,h);
     x.restore();
   }
   x.restore();
+}
+function bakeFree(withOutline){
+  const isT=curType==='tshirt';
+  const W=isT?512:TW, H=isT?512:TH;
+  const c=document.createElement('canvas');
+  c.width=W; c.height=H;
+  const x=c.getContext('2d');
+  x.drawImage(freeBase,0,0);
+  paintStickers(x,isT,true);
+  // fondu au tissu : l'ombrage du vêtement est ré-appliqué sur les calques
+  if($('blendChk') && $('blendChk').checked && stickers.length){
+    const stkOnly=document.createElement('canvas'); stkOnly.width=W; stkOnly.height=H;
+    paintStickers(stkOnly.getContext('2d'),isT,false);
+    const sh=document.createElement('canvas'); sh.width=W; sh.height=H;
+    const shx=sh.getContext('2d');
+    if(isT) tshirtShadows(shx,W,mulberry32(7));
+    else { shadeFaces(shx); edgeAO(shx); }
+    shx.globalCompositeOperation='destination-in';
+    shx.drawImage(stkOnly,0,0);
+    x.drawImage(sh,0,0);
+  }
   if(withOutline && selStk>=0 && stickers[selStk]){
     const s=stickers[selStk], {w,h}=stickerDims(s);
     x.save();
@@ -2980,6 +3057,21 @@ $('mainCanvas').addEventListener('pointermove',e=>{
   renderFree();
 });
 $('mainCanvas').addEventListener('pointerup',()=>{ dragging=false; });
+$('blendChk').addEventListener('change',()=>{ if(freeMode) renderFree(); });
+
+/* Depuis n'importe quel design affiché : basculer en édition par calques */
+$('layersBtn').addEventListener('click',()=>{
+  if(!current) return;
+  curType=current.kind;
+  setTabs($('typeTabs'),'type',curType);
+  refreshTypeUI();
+  curMode='image';
+  setTabs($('modeTabs'),'mode','image');
+  $('autoControls').style.display='none';
+  $('imageControls').style.display='';
+  $('placementSel').value='libre';
+  $('placementSel').dispatchEvent(new Event('change'));
+});
 
 /* ----- bibliothèque d'images + détourage + baguette magique ----- */
 const dz=$('dropZone');
