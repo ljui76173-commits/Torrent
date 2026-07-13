@@ -3464,6 +3464,8 @@ $('genImgBtn').addEventListener('click',()=>{
     // photo de vêtement : détourage doux pour ne pas manger les tissus clairs
     img=preprocessImage(IMG_LIB[selLib].raw, $('removeBgChk').checked,
       Math.min(parseInt($('tolRange').value,10), 13));
+    const lighten=parseInt($('lightenRange').value,10);
+    if(lighten>0) img=lightenCanvas(img, lighten);
   }
   const g=generateFromImage(curType, img, placement, $('logoBase').value, parseInt($('logoScale').value,10), $('shadowChk').checked);
   const item={canvas:g.canvas, kind:curType, seed:null,
