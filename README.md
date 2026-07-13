@@ -50,6 +50,7 @@ Charge **autant d'images que tu veux** (bibliothèque à vignettes) :
 - ✂️ **Suppression automatique du fond** (sensibilité réglable) + recadrage sur le motif
 - 🪄 **Baguette magique** : clique les zones de l'image à garder, le reste est supprimé
 - 🖨️ **Effet photocopie** pour transformer n'importe quelle image en print catalogue
+- ☀️ **Éclaircir (ombres → blanc)** : relève le point blanc pour blanchir les plis/ombres gris d'un template sans toucher aux graphismes sombres
 - 🗂️ **Calques** en placement libre : empile plusieurs images, réordonne, duplique, supprime ; bouton **🖌️ Ajouter des images** sous l'aperçu pour passer n'importe quel design en mode calques, avec **fusion au tissu** (les images prennent l'ombrage du vêtement)
 - 🧥 **Photo de vêtement à plat** avec **auto-détection de la silhouette** : l'outil trouve seul le corps et les manches et les mappe aux bonnes faces (calibrées en jeu)
 - Placements : **logo poitrine** (ombre portée), **logo devant + dos**,

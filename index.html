@@ -184,6 +184,11 @@
       </div>
       <label class="check"><input type="checkbox" id="xeroxChk"> 🖨️ Effet photocopie (print noir &amp; blanc style catalogue)</label>
 
+      <div class="field">
+        <label>☀️ Éclaircir (ombres → blanc) : <span id="lightenVal">0</span></label>
+        <input type="range" id="lightenRange" min="0" max="100" value="0">
+      </div>
+
       <label class="check"><input type="checkbox" id="wandChk"> 🪄 Baguette magique — clique sur l'aperçu de l'image pour <b>garder</b> une zone (clics multiples = plusieurs zones)</label>
       <div class="row" id="wandRow" style="display:none; margin-bottom:10px">
         <button class="btn small green" id="wandApply">✅ Appliquer</button>
@@ -3081,9 +3086,27 @@ dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over');}
 dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
 dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');loadFiles(e.dataTransfer.files);});
 
+function lightenCanvas(canvas, amount){
+  // relève le point blanc : les gris clairs (ombres/plis) montent vers le blanc,
+  // les zones sombres (graphismes) restent sombres
+  const wp = 255 - amount*1.3;               // amount 0..100 -> point blanc 255..125
+  const k = 255/Math.max(90,wp);
+  const ctx=canvas.getContext('2d'), W=canvas.width, H=canvas.height;
+  const id=ctx.getImageData(0,0,W,H), d=id.data;
+  for(let i=0;i<d.length;i+=4){
+    if(d[i+3]===0) continue;
+    d[i]  =Math.min(255,d[i]  *k);
+    d[i+1]=Math.min(255,d[i+1]*k);
+    d[i+2]=Math.min(255,d[i+2]*k);
+  }
+  ctx.putImageData(id,0,0);
+  return canvas;
+}
 function processEntry(entry){
   entry.processed = preprocessImage(entry.raw, $('removeBgChk').checked, parseInt($('tolRange').value,10));
   if($('xeroxChk').checked) entry.processed = xeroxify(entry.processed, mulberry32(Math.floor(Math.random()*1e9)));
+  const lighten=parseInt($('lightenRange').value,10);
+  if(lighten>0) entry.processed = lightenCanvas(entry.processed, lighten);
   entry.wandMask=null;
 }
 function loadFiles(files){
@@ -3213,6 +3236,8 @@ $('removeBgChk').addEventListener('change',()=>{
 $('tolRange').addEventListener('input',()=>{ $('tolVal').textContent=$('tolRange').value; });
 $('tolRange').addEventListener('change',()=>{ if(!$('wandChk').checked) reprocessImage(); });
 $('xeroxChk').addEventListener('change',reprocessImage);
+$('lightenRange').addEventListener('input',()=>{ $('lightenVal').textContent=$('lightenRange').value; });
+$('lightenRange').addEventListener('change',reprocessImage);
 
 /* ----- rendu de l'aperçu principal ----- */
 function renderMain(){
