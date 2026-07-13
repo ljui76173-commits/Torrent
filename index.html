@@ -3102,11 +3102,20 @@ function lightenCanvas(canvas, amount){
   ctx.putImageData(id,0,0);
   return canvas;
 }
-function processEntry(entry){
-  entry.processed = preprocessImage(entry.raw, $('removeBgChk').checked, parseInt($('tolRange').value,10));
-  if($('xeroxChk').checked) entry.processed = xeroxify(entry.processed, mulberry32(Math.floor(Math.random()*1e9)));
+function cloneCanvas(src){
+  const c=document.createElement('canvas'); c.width=src.width; c.height=src.height;
+  c.getContext('2d').drawImage(src,0,0); return c;
+}
+function applyLighten(entry){
   const lighten=parseInt($('lightenRange').value,10);
-  if(lighten>0) entry.processed = lightenCanvas(entry.processed, lighten);
+  entry.processed = lighten>0 ? lightenCanvas(cloneCanvas(entry.base), lighten) : cloneCanvas(entry.base);
+}
+function processEntry(entry){
+  // base = détourage + photocopie (calcul lourd), figée ; l'éclaircissement
+  // s'applique par-dessus une COPIE, donc réglable en direct sans tout refaire
+  entry.base = preprocessImage(entry.raw, $('removeBgChk').checked, parseInt($('tolRange').value,10));
+  if($('xeroxChk').checked) entry.base = xeroxify(entry.base, mulberry32(Math.floor(Math.random()*1e9)));
+  applyLighten(entry);
   entry.wandMask=null;
 }
 function loadFiles(files){
@@ -3236,8 +3245,11 @@ $('removeBgChk').addEventListener('change',()=>{
 $('tolRange').addEventListener('input',()=>{ $('tolVal').textContent=$('tolRange').value; });
 $('tolRange').addEventListener('change',()=>{ if(!$('wandChk').checked) reprocessImage(); });
 $('xeroxChk').addEventListener('change',reprocessImage);
-$('lightenRange').addEventListener('input',()=>{ $('lightenVal').textContent=$('lightenRange').value; });
-$('lightenRange').addEventListener('change',reprocessImage);
+$('lightenRange').addEventListener('input',()=>{
+  $('lightenVal').textContent=$('lightenRange').value;
+  const entry=IMG_LIB[selLib];
+  if(entry && entry.base){ applyLighten(entry); refreshLib(); renderDropPreview(); } // live, léger
+});
 
 /* ----- rendu de l'aperçu principal ----- */
 function renderMain(){
